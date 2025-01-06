@@ -5,8 +5,8 @@ package upgradecmd
 import (
 	"os"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 	"github.com/spf13/cobra"
 )
 

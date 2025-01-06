@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/config"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/kardianos/osext"
 	"github.com/shirou/gopsutil/process"
 )
@@ -31,7 +31,7 @@ var (
 
 // This function needs to be called to initialize this package
 //
-// this init is partly "borrowed" from metalgo/config/config.go
+// this init is partly "borrowed" from avalanchego/config/config.go
 func getScanConfigDirs() ([]string, error) {
 	folderPath, err := osext.ExecutableFolder()
 	scanConfigDirs := []string{}
@@ -55,7 +55,7 @@ func getScanConfigDirs() ([]string, error) {
 		home,
 		filepath.Join(home, constants.AvalancheGoRepoName),
 		filepath.Join(home, defaultAvalanchegoBuildDir),
-		filepath.Join(home, ".metalgo"),
+		filepath.Join(home, ".avalanchego"),
 		defaultUnexpandedDataDir,
 	)
 	return scanConfigDirs, nil

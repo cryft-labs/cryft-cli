@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-
+	"github.com/ava-labs/avalanche-cli/pkg/application"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +15,7 @@ func newExportCmd() *cobra.Command {
 		Use:   "export [keyName]",
 		Short: "Exports a signing key",
 		Long: `The key export command exports a created signing key. You can use an exported key in other
-applications or import it into another instance of Metal-CLI.
+applications or import it into another instance of Avalanche-CLI.
 
 By default, the tool writes the hex encoded key to stdout. If you provide the --output
 flag, the command writes the key to a file of your choosing.`,
@@ -50,5 +49,5 @@ func exportKey(_ *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return os.WriteFile(filename, keyBytes, constants.WriteReadReadPerms)
+	return os.WriteFile(filename, keyBytes, application.WriteReadReadPerms)
 }

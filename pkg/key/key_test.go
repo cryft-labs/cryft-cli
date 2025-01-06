@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/MetalBlockchain/metalgo/utils/cb58"
-	"github.com/MetalBlockchain/metalgo/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/cb58"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
 const (
@@ -55,15 +55,18 @@ func TestNewKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ewoqPk, err := secp256k1.ToPrivateKey(skBytes)
+	factory := &crypto.FactorySECP256K1R{}
+	rpk, err := factory.ToPrivateKey(skBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
+	ewoqPk, _ := rpk.(*crypto.PrivateKeySECP256K1R)
 
-	privKey2, err := secp256k1.NewPrivateKey()
+	rpk2, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	privKey2, _ := rpk2.(*crypto.PrivateKeySECP256K1R)
 
 	tt := []struct {
 		name   string

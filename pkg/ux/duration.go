@@ -15,26 +15,26 @@ func FormatDuration(d time.Duration) string {
 	y := d / (24 * 365 * time.Hour)
 	if y > 0 {
 		d -= y * 24 * 365 * time.Hour
-		_, _ = sb.WriteString(fmt.Sprintf("%d years ", y))
+		sb.WriteString(fmt.Sprintf("%d years ", y))
 	}
 	dd := d / (24 * time.Hour)
 	if dd > 0 {
 		d -= dd * 24 * time.Hour
-		_, _ = sb.WriteString(fmt.Sprintf("%d days ", dd))
+		sb.WriteString(fmt.Sprintf("%d days ", dd))
 	}
 	h := d / time.Hour
 	if h > 0 {
 		d -= h * time.Hour
-		_, _ = sb.WriteString(fmt.Sprintf("%d hours ", h))
+		sb.WriteString(fmt.Sprintf("%d hours ", h))
 	}
 	m := d / time.Minute
 	if m > 0 {
 		d -= m * time.Minute
-		_, _ = sb.WriteString(fmt.Sprintf("%d minutes ", m))
+		sb.WriteString(fmt.Sprintf("%d minutes ", m))
 	}
 	s := d / time.Second
 	if s > 0 {
-		_, _ = sb.WriteString(fmt.Sprintf("%d seconds ", s))
+		sb.WriteString(fmt.Sprintf("%d seconds ", s))
 	}
 
 	return sb.String()

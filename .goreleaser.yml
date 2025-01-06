@@ -1,15 +1,14 @@
 # ref. https://goreleaser.com/customization/build/
 builds:
-  - id: metal-cli
+  - id: avalanche-cli
     main: ./main.go
-    binary: metal
+    binary: avalanche
     flags:
       - -v
     # windows is ignored by default, as the `goos` field by default only
     # contains linux and darwin
     ldflags:
-      - -X 'github.com/cryft-labs/cryft-cli/cmd.Version={{.Version}}'
-      - -X 'github.com/cryft-labs/cryft-cli/pkg/utils.telemetryToken={{ .Env.TELEMETRY_TOKEN }}'
+      - -X 'github.com/ava-labs/avalanche-cli/cmd.Version={{.Version}}'
     goos:
       - linux
       - darwin
@@ -33,30 +32,9 @@ builds:
         goamd64: v1
         env:
           - CC=o64-clang
-dockers:
-  - image_templates:
-    - 'metalblockchain/metal-cli:{{ .Tag }}-amd64'
-    dockerfile: "{{ .Env.DOCKERFILE }}"
-    use: buildx
-    build_flag_templates:
-    - "--pull"
-    - "--platform=linux/amd64"
-  - image_templates:
-    - 'metalblockchain/metal-cli:{{ .Tag }}-arm64'
-    dockerfile: "{{ .Env.DOCKERFILE }}"
-    use: buildx
-    build_flag_templates:
-    - "--pull"
-    - "--platform=linux/arm64"
-    goarch: arm64
-docker_manifests:
-  - name_template: 'metalblockchain/metal-cli:{{ .Tag }}'
-    image_templates:
-    - 'metalblockchain/metal-cli:{{ .Tag }}-amd64'
-    - 'metalblockchain/metal-cli:{{ .Tag }}-arm64'
 release:
   # Repo in which the release will be created.
   # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
-    owner: MetalBlockchain
-    name: metal-cli
+    owner: ava-labs
+    name: avalanche-cli

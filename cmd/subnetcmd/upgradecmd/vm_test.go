@@ -7,14 +7,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/config"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/utils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/config"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/pkg/utils"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,7 +130,7 @@ func TestAtMostOneNetworkSelected(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			useConfig = tt.useConfig
 			useLocal = tt.useLocal
 			useFuji = tt.useFuji
@@ -217,7 +217,7 @@ func TestAtMostOneVersionSelected(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			useLatest = tt.useLatest
 			targetVersion = tt.version
 			binaryPathArg = tt.binary
@@ -270,7 +270,7 @@ func TestAtMostOneAutomationSelected(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			useManual = tt.useManual
 			pluginDir = tt.pluginDir
 
@@ -321,7 +321,7 @@ func TestUpdateToCustomBin(t *testing.T) {
 
 	assert.FileExists(binaryPath)
 
-	err = updateToCustomBin(sc, networkToUpgrade, binaryPath, false)
+	err = updateToCustomBin(subnetName, sc, networkToUpgrade, binaryPath)
 	assert.NoError(err)
 
 	// check new binary exists and matches

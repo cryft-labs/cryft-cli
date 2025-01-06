@@ -5,7 +5,7 @@ package transactioncmd
 import (
 	"fmt"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func NewCmd(injectedApp *application.Avalanche) *cobra.Command {
 		Use:   "transaction",
 		Short: "Sign and execute specific transactions",
 		Long:  `The transaction command suite provides all of the utilities required to sign multisig transactions.`,
-		Run: func(cmd *cobra.Command, _ []string) {
+		Run: func(cmd *cobra.Command, args []string) {
 			err := cmd.Help()
 			if err != nil {
 				fmt.Println(err)

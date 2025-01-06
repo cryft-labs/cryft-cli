@@ -12,17 +12,15 @@ import (
 	"os/signal"
 	"path"
 	"syscall"
-	"time"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/utils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metal-network-runner/client"
-	"github.com/MetalBlockchain/metal-network-runner/server"
-	anrutils "github.com/MetalBlockchain/metal-network-runner/utils"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
-	"github.com/MetalBlockchain/metalgo/utils/perms"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-network-runner/client"
+	"github.com/ava-labs/avalanche-network-runner/server"
+	"github.com/ava-labs/avalanche-network-runner/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/shirou/gopsutil/process"
 	"go.uber.org/zap"
@@ -45,37 +43,8 @@ func NewProcessChecker() ProcessChecker {
 	return &realProcessRunner{}
 }
 
-type GRPCClientOp struct {
-	avoidRPCVersionCheck bool
-	dialTimeout          time.Duration
-}
-
-type GRPCClientOpOption func(*GRPCClientOp)
-
-func (op *GRPCClientOp) applyOpts(opts []GRPCClientOpOption) {
-	for _, opt := range opts {
-		opt(op)
-	}
-}
-
-func WithAvoidRPCVersionCheck(avoidRPCVersionCheck bool) GRPCClientOpOption {
-	return func(op *GRPCClientOp) {
-		op.avoidRPCVersionCheck = avoidRPCVersionCheck
-	}
-}
-
-func WithDialTimeout(dialTimeout time.Duration) GRPCClientOpOption {
-	return func(op *GRPCClientOp) {
-		op.dialTimeout = dialTimeout
-	}
-}
-
 // NewGRPCClient hides away the details (params) of creating a gRPC server connection
-func NewGRPCClient(opts ...GRPCClientOpOption) (client.Client, error) {
-	op := GRPCClientOp{
-		dialTimeout: gRPCDialTimeout,
-	}
-	op.applyOpts(opts)
+func NewGRPCClient() (client.Client, error) {
 	logLevel, err := logging.ToLevel(gRPCClientLogLevel)
 	if err != nil {
 		return nil, err
@@ -90,27 +59,10 @@ func NewGRPCClient(opts ...GRPCClientOpOption) (client.Client, error) {
 	}
 	client, err := client.New(client.Config{
 		Endpoint:    gRPCServerEndpoint,
-		DialTimeout: op.dialTimeout,
+		DialTimeout: gRPCDialTimeout,
 	}, log)
 	if errors.Is(err, context.DeadlineExceeded) {
 		err = ErrGRPCTimeout
-	}
-	if client != nil && !op.avoidRPCVersionCheck {
-		ctx, cancel := utils.GetAPIContext()
-		defer cancel()
-		rpcVersion, err := client.RPCVersion(ctx)
-		if err != nil {
-			return nil, err
-		}
-		// obtained using server API
-		serverVersion := rpcVersion.Version
-		// obtained from ANR source code
-		clientVersion := server.RPCVersion
-		if serverVersion != clientVersion {
-			return nil, fmt.Errorf("trying to connect to a backend controller that uses a different RPC version (%d) than the CLI client (%d). Use 'network stop' to stop the controller and then restart the operation",
-				serverVersion,
-				clientVersion)
-		}
 	}
 	return client, err
 }
@@ -126,12 +78,11 @@ func NewGRPCServer(snapshotsDir string) (server.Server, error) {
 		return nil, err
 	}
 	return server.New(server.Config{
-		Port:                gRPCServerPort,
-		GwPort:              gRPCGatewayPort,
+		Port:                gRPCServerEndpoint,
+		GwPort:              gRPCGatewayEndpoint,
 		DialTimeout:         gRPCDialTimeout,
 		SnapshotsDir:        snapshotsDir,
 		RedirectNodesOutput: false,
-		LogLevel:            logging.Info,
 	}, log)
 }
 
@@ -167,20 +118,6 @@ type runFile struct {
 	GRPCserverFileName string `json:"gRPCserverFileName"`
 }
 
-func GetBackendLogFile(app *application.Avalanche) (string, error) {
-	var rf runFile
-	serverRunFilePath := app.GetRunFile()
-	run, err := os.ReadFile(serverRunFilePath)
-	if err != nil {
-		return "", fmt.Errorf("failed reading process info file at %s: %w", serverRunFilePath, err)
-	}
-	if err := json.Unmarshal(run, &rf); err != nil {
-		return "", fmt.Errorf("failed unmarshalling server run file at %s: %w", serverRunFilePath, err)
-	}
-
-	return rf.GRPCserverFileName, nil
-}
-
 func GetServerPID(app *application.Avalanche) (int, error) {
 	var rf runFile
 	serverRunFilePath := app.GetRunFile()
@@ -207,12 +144,12 @@ func StartServerProcess(app *application.Avalanche) error {
 	cmd := exec.Command(thisBin, args...)
 
 	outputDirPrefix := path.Join(app.GetRunDir(), "server")
-	outputDir, err := anrutils.MkDirWithTimestamp(outputDirPrefix)
+	outputDir, err := utils.MkDirWithTimestamp(outputDirPrefix)
 	if err != nil {
 		return err
 	}
 
-	outputFile, err := os.Create(path.Join(outputDir, "metal-cli-backend"))
+	outputFile, err := os.Create(path.Join(outputDir, "avalanche-cli-backend"))
 	if err != nil {
 		return err
 	}
@@ -242,21 +179,30 @@ func StartServerProcess(app *application.Avalanche) error {
 	return nil
 }
 
+// GetAsyncContext returns a timeout context with the cancel function suppressed
+func GetAsyncContext() context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), constants.RequestTimeout)
+	// don't call since "start" is async
+	// and the top-level context here "ctx" is passed
+	// to all underlying function calls
+	// just set the timeout to halt "Start" async ops
+	// when the deadline is reached
+	_ = cancel
+
+	return ctx
+}
+
 func KillgRPCServerProcess(app *application.Avalanche) error {
-	cli, err := NewGRPCClient(
-		WithAvoidRPCVersionCheck(true),
-		WithDialTimeout(constants.FastGRPCDialTimeout),
-	)
+	cli, err := NewGRPCClient()
 	if err != nil {
 		return err
 	}
 	defer cli.Close()
-	ctx, cancel := utils.GetAPIContext()
-	defer cancel()
+	ctx := GetAsyncContext()
 	_, err = cli.Stop(ctx)
 	if err != nil {
 		if server.IsServerError(err, server.ErrNotBootstrapped) {
-			app.Log.Debug("No local network running")
+			ux.Logger.PrintToUser("No local network running")
 		} else {
 			app.Log.Debug("failed stopping local network", zap.Error(err))
 		}

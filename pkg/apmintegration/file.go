@@ -8,12 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cryft-labs/apm/types"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
+	"github.com/ava-labs/apm/types"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
 	"gopkg.in/yaml.v3"
 )
-
-const yamlExt = ".yaml"
 
 func GetRepos(app *application.Avalanche) ([]string, error) {
 	repositoryDir := filepath.Join(app.ApmDir, "repositories")
@@ -67,7 +65,7 @@ func LoadSubnetFile(app *application.Avalanche, subnetKey string) (types.Subnet,
 		return types.Subnet{}, err
 	}
 
-	subnetYamlPath := filepath.Join(app.ApmDir, "repositories", repoAlias, "subnets", subnetName+yamlExt)
+	subnetYamlPath := filepath.Join(app.ApmDir, "repositories", repoAlias, "subnets", subnetName+".yaml")
 	var subnetWrapper SubnetWrapper
 
 	subnetYamlBytes, err := os.ReadFile(subnetYamlPath)
@@ -93,7 +91,7 @@ func getVMsInSubnet(app *application.Avalanche, subnetKey string) ([]string, err
 }
 
 func LoadVMFile(app *application.Avalanche, repo, vm string) (types.VM, error) {
-	vmYamlPath := filepath.Join(app.ApmDir, "repositories", repo, "vms", vm+yamlExt)
+	vmYamlPath := filepath.Join(app.ApmDir, "repositories", repo, "vms", vm+".yaml")
 	var vmWrapper VMWrapper
 
 	vmYamlBytes, err := os.ReadFile(vmYamlPath)

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/MetalBlockchain/metalgo/config"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -86,8 +86,8 @@ func TestFindDefaultFiles(t *testing.T) {
 
 	scanDirs := []string{
 		// firs indexes should succeed
-		filepath.Join(testDir, "etc", "metalgo"),
-		filepath.Join(testDir, "home", ".metalgo"),
+		filepath.Join(testDir, "etc", "avalanchego"),
+		filepath.Join(testDir, "home", ".avalanchego"),
 		testDir,
 		"$" + config.AvalancheGoDataDirVar,
 		// following indexes should fail (don't exist)

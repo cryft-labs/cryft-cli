@@ -5,49 +5,32 @@ package subnetcmd
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
 	"unicode"
 
-	"github.com/cryft-labs/cryft-cli/cmd/flags"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/metrics"
-
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/cryft-labs/cryft-cli/pkg/vm"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/vm"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
 
 const (
-	forceFlag  = "force"
-	latest     = "latest"
-	preRelease = "pre-release"
+	forceFlag = "force"
+	latest    = "latest"
 )
 
 var (
-	forceCreate                    bool
-	useSubnetEvm                   bool
-	genesisFile                    string
-	vmFile                         string
-	useCustom                      bool
-	evmVersion                     string
-	evmChainID                     uint64
-	evmToken                       string
-	evmDefaults                    bool
-	useLatestReleasedEvmVersion    bool
-	useLatestPreReleasedEvmVersion bool
-	useRepo                        bool
-	teleporterReady                bool
-	runRelayer                     bool
-	useWarp                        bool
+	forceCreate      bool
+	useSubnetEvm     bool
+	useSpacesVM      bool
+	genesisFile      string
+	vmFile           string
+	useCustom        bool
+	vmVersion        string
+	useLatestVersion bool
 
 	errIllegalNameCharacter = errors.New(
 		"illegal name character: only letters, no special characters allowed")
-	errMutuallyExlusiveVersionOptions = errors.New("version flags --latest,--pre-release,vm-version are mutually exclusive")
-	errMutuallyVMConfigOptions        = errors.New("specifying --genesis flag disables SubnetEVM config flags --evm-chain-id,--evm-token,--evm-defaults")
 )
 
 // avalanche subnet create
@@ -59,82 +42,30 @@ func newCreateCmd() *cobra.Command {
 By default, the command runs an interactive wizard. It walks you through
 all the steps you need to create your first Subnet.
 
-The tool supports deploying Subnet-EVM, and custom VMs. You
+The tool supports deploying Subnet-EVM, SpacesVM, and custom VMs. You
 can create a custom, user-generated genesis with a custom VM by providing
 the path to your genesis and VM binaries with the --genesis and --vm flags.
 
 By default, running the command with a subnetName that already exists
 causes the command to fail. If you’d like to overwrite an existing
 configuration, pass the -f flag.`,
-		SilenceUsage:      true,
-		Args:              cobra.ExactArgs(1),
-		RunE:              createSubnetConfig,
-		PersistentPostRun: handlePostRun,
+		SilenceUsage: true,
+		Args:         cobra.ExactArgs(1),
+		RunE:         createSubnetConfig,
 	}
 	cmd.Flags().StringVar(&genesisFile, "genesis", "", "file path of genesis to use")
+	cmd.Flags().StringVar(&vmFile, "vm", "", "file path of custom vm to use")
 	cmd.Flags().BoolVar(&useSubnetEvm, "evm", false, "use the Subnet-EVM as the base template")
-	cmd.Flags().StringVar(&evmVersion, "vm-version", "", "version of Subnet-EVM template to use")
-	cmd.Flags().Uint64Var(&evmChainID, "evm-chain-id", 0, "chain ID to use with Subnet-EVM")
-	cmd.Flags().StringVar(&evmToken, "evm-token", "", "token name to use with Subnet-EVM")
-	cmd.Flags().BoolVar(&evmDefaults, "evm-defaults", false, "use default settings for fees/airdrop/precompiles/teleporter with Subnet-EVM")
+	cmd.Flags().BoolVar(&useSpacesVM, "spacesvm", false, "use the SpacesVM as the base template")
+	cmd.Flags().StringVar(&vmVersion, "vm-version", "", "version of vm template to use")
 	cmd.Flags().BoolVar(&useCustom, "custom", false, "use a custom VM template")
-	cmd.Flags().BoolVar(&useLatestPreReleasedEvmVersion, preRelease, false, "use latest Subnet-EVM pre-released version, takes precedence over --vm-version")
-	cmd.Flags().BoolVar(&useLatestReleasedEvmVersion, latest, false, "use latest Subnet-EVM released version, takes precedence over --vm-version")
+	cmd.Flags().BoolVar(&useLatestVersion, latest, false, "use latest VM version, takes precedence over --vm-version")
 	cmd.Flags().BoolVarP(&forceCreate, forceFlag, "f", false, "overwrite the existing configuration if one exists")
-	cmd.Flags().StringVar(&vmFile, "vm", "", "file path of custom vm to use. alias to custom-vm-path")
-	cmd.Flags().StringVar(&vmFile, "custom-vm-path", "", "file path of custom vm to use")
-	cmd.Flags().StringVar(&customVMRepoURL, "custom-vm-repo-url", "", "custom vm repository url")
-	cmd.Flags().StringVar(&customVMBranch, "custom-vm-branch", "", "custom vm branch or commit")
-	cmd.Flags().StringVar(&customVMBuildScript, "custom-vm-build-script", "", "custom vm build-script")
-	cmd.Flags().BoolVar(&useRepo, "from-github-repo", false, "generate custom VM binary from github repository")
-	cmd.Flags().BoolVar(&useWarp, "warp", true, "generate a vm with warp support (needed for teleporter)")
-	cmd.Flags().BoolVar(&teleporterReady, "teleporter", false, "generate a teleporter-ready vm")
-	cmd.Flags().BoolVar(&runRelayer, "relayer", false, "run AWM relayer when deploying the vm")
 	return cmd
 }
 
-func CallCreate(
-	cmd *cobra.Command,
-	subnetName string,
-	forceCreateParam bool,
-	genesisFileParam string,
-	useSubnetEvmParam bool,
-	useCustomParam bool,
-	evmVersionParam string,
-	evmChainIDParam uint64,
-	evmTokenParam string,
-	evmDefaultsParam bool,
-	useLatestReleasedEvmVersionParam bool,
-	useLatestPreReleasedEvmVersionParam bool,
-	customVMRepoURLParam string,
-	customVMBranchParam string,
-	customVMBuildScriptParam string,
-) error {
-	forceCreate = forceCreateParam
-	genesisFile = genesisFileParam
-	useSubnetEvm = useSubnetEvmParam
-	evmVersion = evmVersionParam
-	evmChainID = evmChainIDParam
-	evmToken = evmTokenParam
-	evmDefaults = evmDefaultsParam
-	useLatestReleasedEvmVersion = useLatestReleasedEvmVersionParam
-	useLatestPreReleasedEvmVersion = useLatestPreReleasedEvmVersionParam
-	useCustom = useCustomParam
-	customVMRepoURL = customVMRepoURLParam
-	customVMBranch = customVMBranchParam
-	customVMBuildScript = customVMBuildScriptParam
-	return createSubnetConfig(cmd, []string{subnetName})
-}
-
-func detectVMTypeFromFlags() {
-	// assumes custom
-	if customVMRepoURL != "" || customVMBranch != "" || customVMBuildScript != "" {
-		useCustom = true
-	}
-}
-
 func moreThanOneVMSelected() bool {
-	vmVars := []bool{useSubnetEvm, useCustom}
+	vmVars := []bool{useSubnetEvm, useSpacesVM, useCustom}
 	firstSelect := false
 	for _, val := range vmVars {
 		if firstSelect && val {
@@ -150,16 +81,16 @@ func getVMFromFlag() models.VMType {
 	if useSubnetEvm {
 		return models.SubnetEvm
 	}
+	if useSpacesVM {
+		return models.SpacesVM
+	}
 	if useCustom {
 		return models.CustomVM
 	}
 	return ""
 }
 
-// override postrun function from root.go, so that we don't double send metrics for the same command
-func handlePostRun(_ *cobra.Command, _ []string) {}
-
-func createSubnetConfig(cmd *cobra.Command, args []string) error {
+func createSubnetConfig(_ *cobra.Command, args []string) error {
 	subnetName := args[0]
 	if app.GenesisExists(subnetName) && !forceCreate {
 		return errors.New("configuration already exists. Use --" + forceFlag + " parameter to overwrite")
@@ -169,18 +100,8 @@ func createSubnetConfig(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("subnet name %q is invalid: %w", subnetName, err)
 	}
 
-	detectVMTypeFromFlags()
-
 	if moreThanOneVMSelected() {
 		return errors.New("too many VMs selected. Provide at most one VM selection flag")
-	}
-
-	if !flags.EnsureMutuallyExclusive([]bool{useLatestReleasedEvmVersion, useLatestPreReleasedEvmVersion, evmVersion != ""}) {
-		return errMutuallyExlusiveVersionOptions
-	}
-
-	if genesisFile != "" && (evmChainID != 0 || evmToken != "" || evmDefaults) {
-		return errMutuallyVMConfigOptions
 	}
 
 	subnetType := getVMFromFlag()
@@ -188,7 +109,7 @@ func createSubnetConfig(cmd *cobra.Command, args []string) error {
 	if subnetType == "" {
 		subnetTypeStr, err := app.Prompt.CaptureList(
 			"Choose your VM",
-			[]string{models.SubnetEvm, models.CustomVM},
+			[]string{models.SubnetEvm, models.SpacesVM, models.CustomVM},
 		)
 		if err != nil {
 			return err
@@ -202,56 +123,32 @@ func createSubnetConfig(cmd *cobra.Command, args []string) error {
 		err          error
 	)
 
-	if useLatestReleasedEvmVersion {
-		evmVersion = latest
+	if useLatestVersion {
+		vmVersion = latest
 	}
 
-	if useLatestPreReleasedEvmVersion {
-		evmVersion = preRelease
-	}
-
-	if evmVersion != latest && evmVersion != preRelease && evmVersion != "" && !semver.IsValid(evmVersion) {
-		return fmt.Errorf("invalid version string, should be semantic version (ex: v1.1.1): %s", evmVersion)
+	if vmVersion != latest && vmVersion != "" && !semver.IsValid(vmVersion) {
+		return fmt.Errorf("invalid version string, should be semantic version (ex: v1.1.1): %s", vmVersion)
 	}
 
 	switch subnetType {
 	case models.SubnetEvm:
-		genesisBytes, sc, err = vm.CreateEvmSubnetConfig(
-			app,
-			subnetName,
-			genesisFile,
-			evmVersion,
-			true,
-			evmChainID,
-			evmToken,
-			evmDefaults,
-			useWarp,
-		)
+		genesisBytes, sc, err = vm.CreateEvmSubnetConfig(app, subnetName, genesisFile, vmVersion)
+		if err != nil {
+			return err
+		}
+	case models.SpacesVM:
+		genesisBytes, sc, err = vm.CreateSpacesVMSubnetConfig(app, subnetName, genesisFile, vmVersion)
 		if err != nil {
 			return err
 		}
 	case models.CustomVM:
-		genesisBytes, sc, err = vm.CreateCustomSubnetConfig(
-			app,
-			subnetName,
-			genesisFile,
-			useRepo,
-			customVMRepoURL,
-			customVMBranch,
-			customVMBuildScript,
-			vmFile,
-		)
+		genesisBytes, sc, err = vm.CreateCustomSubnetConfig(app, subnetName, genesisFile, vmFile)
 		if err != nil {
 			return err
 		}
 	default:
 		return errors.New("not implemented")
-	}
-
-	if isSubnetEVMGenesis := jsonIsSubnetEVMGenesis(genesisBytes); isSubnetEVMGenesis {
-		if evmDefaults {
-			runRelayer = true
-		}
 	}
 
 	if err = app.WriteGenesisFile(subnetName, genesisBytes); err != nil {
@@ -262,44 +159,8 @@ func createSubnetConfig(cmd *cobra.Command, args []string) error {
 	if err = app.CreateSidecar(sc); err != nil {
 		return err
 	}
-	if subnetType == models.SubnetEvm {
-		err = sendMetrics(cmd, subnetType.RepoName(), subnetName)
-		if err != nil {
-			return err
-		}
-	}
-	ux.Logger.GreenCheckmarkToUser("Successfully created subnet configuration")
-	return nil
-}
 
-func sendMetrics(cmd *cobra.Command, repoName, subnetName string) error {
-	flags := make(map[string]string)
-	flags[constants.SubnetType] = repoName
-	genesis, err := app.LoadEvmGenesis(subnetName)
-	if err != nil {
-		return err
-	}
-	conf := genesis.Config.GenesisPrecompiles
-	precompiles := make([]string, 6)
-	for precompileName := range conf {
-		precompileTag := "precompile-" + precompileName
-		flags[precompileTag] = precompileName
-		precompiles = append(precompiles, precompileName)
-	}
-	numAirdropAddresses := len(genesis.Alloc)
-	for address := range genesis.Alloc {
-		if address.String() != vm.PrefundedEwoqAddress.String() {
-			precompileTag := "precompile-" + constants.CustomAirdrop
-			flags[precompileTag] = constants.CustomAirdrop
-			precompiles = append(precompiles, constants.CustomAirdrop)
-			break
-		}
-	}
-	sort.Strings(precompiles)
-	precompilesJoined := strings.Join(precompiles, ",")
-	flags[constants.PrecompileType] = precompilesJoined
-	flags[constants.NumberOfAirdrops] = strconv.Itoa(numAirdropAddresses)
-	metrics.HandleTracking(cmd, app, flags)
+	ux.Logger.PrintToUser("Successfully created subnet configuration")
 	return nil
 }
 

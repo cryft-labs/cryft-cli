@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cryft-labs/apm/types"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
-	"github.com/MetalBlockchain/metalgo/version"
+	"github.com/ava-labs/apm/types"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/require"
 )
 
@@ -174,7 +174,7 @@ func TestGetSubnets(t *testing.T) {
 
 			// Create subnet files
 			for _, subnet := range tt.subnetNames {
-				subnetFile := filepath.Join(subnetPath, subnet+yamlExt)
+				subnetFile := filepath.Join(subnetPath, subnet+".yaml")
 				err = os.WriteFile(subnetFile, []byte(testSubnetYaml), constants.DefaultPerms755)
 				require.NoError(err)
 			}
@@ -203,7 +203,7 @@ func TestLoadSubnetFile_Success(t *testing.T) {
 	require.NoError(err)
 
 	// Create subnet files
-	subnetFile := filepath.Join(subnetPath, subnet1+yamlExt)
+	subnetFile := filepath.Join(subnetPath, subnet1+".yaml")
 	err = os.WriteFile(subnetFile, []byte(testSubnetYaml), constants.DefaultPerms755)
 	require.NoError(err)
 
@@ -233,7 +233,7 @@ func TestLoadSubnetFile_BadKey(t *testing.T) {
 	require.NoError(err)
 
 	// Create subnet files
-	subnetFile := filepath.Join(subnetPath, subnet1+yamlExt)
+	subnetFile := filepath.Join(subnetPath, subnet1+".yaml")
 	err = os.WriteFile(subnetFile, []byte(testSubnetYaml), constants.DefaultPerms755)
 	require.NoError(err)
 
@@ -253,7 +253,7 @@ func TestGetVMsInSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// Create subnet files
-	subnetFile := filepath.Join(subnetPath, subnet1+yamlExt)
+	subnetFile := filepath.Join(subnetPath, subnet1+".yaml")
 	err = os.WriteFile(subnetFile, []byte(testSubnetYaml), constants.DefaultPerms755)
 	require.NoError(err)
 
@@ -276,7 +276,7 @@ func TestLoadVMFile(t *testing.T) {
 	require.NoError(err)
 
 	// Create subnet files
-	vmFile := filepath.Join(vmPath, vm+yamlExt)
+	vmFile := filepath.Join(vmPath, vm+".yaml")
 	err = os.WriteFile(vmFile, []byte(testVMYaml), constants.DefaultPerms755)
 	require.NoError(err)
 

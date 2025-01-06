@@ -6,11 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/testutils"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,36 +23,4 @@ func TestCleanBins(t *testing.T) {
 	require.NoFileExists(f.Name())
 	require.NoFileExists(f2.Name())
 	require.NoDirExists(dir)
-}
-
-func Test_removeLocalDeployInfoFromSidecars(t *testing.T) {
-	app = testutils.SetupTestInTempDir(t)
-
-	subnetName := "test1"
-
-	localMap := make(map[string]models.NetworkData)
-
-	localMap[models.Local.String()] = models.NetworkData{
-		SubnetID:     ids.ID{1, 2, 3, 4},
-		BlockchainID: ids.ID{1, 2, 3, 4},
-	}
-
-	sc := models.Sidecar{
-		Name:     subnetName,
-		Networks: localMap,
-	}
-
-	err := app.CreateSidecar(&sc)
-	require.NoError(t, err)
-
-	loadedSC, err := app.LoadSidecar(subnetName)
-	require.NoError(t, err)
-	require.Contains(t, loadedSC.Networks, models.Local.String())
-
-	err = removeLocalDeployInfoFromSidecars()
-	require.NoError(t, err)
-
-	loadedSC, err = app.LoadSidecar(subnetName)
-	require.NoError(t, err)
-	require.NotContains(t, loadedSC.Networks, models.Local.String())
 }

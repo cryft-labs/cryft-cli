@@ -5,7 +5,7 @@ package networkcmd
 import (
 	"fmt"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ subnet deploy command starts this network in the background. This command suite 
 to shutdown, restart, and clear that network.
 
 This network currently supports multiple, concurrently deployed Subnets.`,
-		Run: func(cmd *cobra.Command, _ []string) {
+		Run: func(cmd *cobra.Command, args []string) {
 			err := cmd.Help()
 			if err != nil {
 				fmt.Println(err)

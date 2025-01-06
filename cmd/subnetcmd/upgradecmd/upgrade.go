@@ -5,7 +5,7 @@ package upgradecmd
 import (
 	"fmt"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
 	"github.com/spf13/cobra"
 )
 
@@ -15,10 +15,10 @@ var app *application.Avalanche
 func NewCmd(injectedApp *application.Avalanche) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
-		Short: "Upgrade your Subnets",
+		Short: "Upgrade your subnets",
 		Long: `The subnet upgrade command suite provides a collection of tools for
-updating your developmental and deployed Subnets.`,
-		Run: func(cmd *cobra.Command, _ []string) {
+updating your developmental and deployed subnets.`,
+		Run: func(cmd *cobra.Command, args []string) {
 			err := cmd.Help()
 			if err != nil {
 				fmt.Println(err)

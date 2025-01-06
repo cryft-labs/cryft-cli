@@ -3,11 +3,9 @@
 package networkcmd
 
 import (
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/utils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metal-network-runner/server"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-network-runner/server"
 	"github.com/spf13/cobra"
 )
 
@@ -27,15 +25,12 @@ network is running and some basic stats about the network.`,
 func networkStatus(*cobra.Command, []string) error {
 	ux.Logger.PrintToUser("Requesting network status...")
 
-	cli, err := binutils.NewGRPCClient(
-		binutils.WithDialTimeout(constants.FastGRPCDialTimeout),
-	)
+	cli, err := binutils.NewGRPCClient()
 	if err != nil {
 		return err
 	}
 
-	ctx, cancel := utils.GetAPIContext()
-	defer cancel()
+	ctx := binutils.GetAsyncContext()
 	status, err := cli.Status(ctx)
 	if err != nil {
 		if server.IsServerError(err, server.ErrNotBootstrapped) {
@@ -55,7 +50,7 @@ func networkStatus(*cobra.Command, []string) error {
 		ux.Logger.PrintToUser("Number of custom VMs: %d", len(status.ClusterInfo.CustomChains))
 		ux.Logger.PrintToUser("======================================== Node information ========================================")
 		for n, nodeInfo := range status.ClusterInfo.NodeInfos {
-			ux.Logger.PrintToUser("%s has ID %s and endpoint %s ", n, nodeInfo.Id, nodeInfo.Uri)
+			ux.Logger.PrintToUser("%s has ID %s and endpoint %s: ", n, nodeInfo.Id, nodeInfo.Uri)
 		}
 		ux.Logger.PrintToUser("==================================== Custom VM information =======================================")
 		for _, nodeInfo := range status.ClusterInfo.NodeInfos {

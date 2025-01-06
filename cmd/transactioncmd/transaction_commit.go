@@ -3,15 +3,12 @@
 package transactioncmd
 
 import (
-	"fmt"
-
-	"github.com/cryft-labs/cryft-cli/cmd/subnetcmd"
-	"github.com/cryft-labs/cryft-cli/pkg/keychain"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/txutils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-cli/cmd/subnetcmd"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-cli/pkg/txutils"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/spf13/cobra"
 )
 
@@ -53,17 +50,17 @@ func commitTx(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	subnetID := sc.Networks[network.Name()].SubnetID
+	subnetID := sc.Networks[network.String()].SubnetID
 	if subnetID == ids.Empty {
 		return errNoSubnetID
 	}
-	transferSubnetOwnershipTxID := sc.Networks[network.Name()].TransferSubnetOwnershipTxID
 
-	controlKeys, _, err := txutils.GetOwners(network, subnetID, transferSubnetOwnershipTxID)
+	subnetAuthKeys, err := txutils.GetAuthSigners(tx, network, subnetID)
 	if err != nil {
 		return err
 	}
-	subnetAuthKeys, remainingSubnetAuthKeys, err := txutils.GetRemainingSigners(tx, controlKeys)
+
+	remainingSubnetAuthKeys, err := txutils.GetRemainingSigners(tx, network, subnetID)
 	if err != nil {
 		return err
 	}
@@ -72,7 +69,7 @@ func commitTx(_ *cobra.Command, args []string) error {
 		signedCount := len(subnetAuthKeys) - len(remainingSubnetAuthKeys)
 		ux.Logger.PrintToUser("%d of %d required signatures have been signed.", signedCount, len(subnetAuthKeys))
 		subnetcmd.PrintRemainingToSignMsg(subnetName, remainingSubnetAuthKeys, inputTxPath)
-		return fmt.Errorf("tx is not fully signed")
+		return nil
 	}
 
 	// get kc with some random address, to pass wallet creation checks
@@ -82,24 +79,17 @@ func commitTx(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	deployer := subnet.NewPublicDeployer(app, keychain.NewKeychain(network, kc, nil, nil), network)
-	txID, err := deployer.Commit(tx, false)
+	deployer := subnet.NewPublicDeployer(app, false, kc, network)
+	txID, err := deployer.Commit(tx)
 	if err != nil {
 		return err
 	}
 
 	if txutils.IsCreateChainTx(tx) {
-		// TODO: teleporter for multisig
-		if err := subnetcmd.PrintDeployResults(subnetName, subnetID, txID); err != nil {
+		if err := subnetcmd.PrintDeployResults(subnetName, subnetID, txID, true); err != nil {
 			return err
 		}
-		return app.UpdateSidecarNetworks(&sc, network, subnetID, transferSubnetOwnershipTxID, txID, "", "")
-	}
-	if txutils.IsTransferSubnetOwnershipTx(tx) {
-		networkData := sc.Networks[network.Name()]
-		networkData.TransferSubnetOwnershipTxID = txID
-		sc.Networks[network.Name()] = networkData
-		return app.UpdateSidecar(&sc)
+		return app.UpdateSidecarNetworks(&sc, network, subnetID, txID)
 	}
 	ux.Logger.PrintToUser("Transaction successful, transaction ID: %s", txID)
 

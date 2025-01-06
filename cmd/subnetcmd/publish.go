@@ -13,16 +13,16 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/cryft-labs/apm/types"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/utils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/version"
+	"github.com/ava-labs/apm/types"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-cli/pkg/utils"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -64,7 +64,7 @@ func newPublishCmd() *cobra.Command {
 }
 
 func publish(_ *cobra.Command, args []string) error {
-	chains, err := ValidateSubnetNameAndGetChains(args)
+	chains, err := validateSubnetNameAndGetChains(args)
 	if err != nil {
 		return err
 	}
@@ -81,8 +81,8 @@ func publish(_ *cobra.Command, args []string) error {
 
 // isReadyToPublish currently means if deployed to fuji and/or main
 func isReadyToPublish(sc *models.Sidecar) bool {
-	if sc.Networks[models.Tahoe.String()].SubnetID != ids.Empty &&
-		sc.Networks[models.Tahoe.String()].BlockchainID != ids.Empty {
+	if sc.Networks[models.Fuji.String()].SubnetID != ids.Empty &&
+		sc.Networks[models.Fuji.String()].BlockchainID != ids.Empty {
 		return true
 	}
 	if sc.Networks[models.Mainnet.String()].SubnetID != ids.Empty &&
@@ -365,7 +365,7 @@ func getSubnetInfo(sc *models.Sidecar) (*types.Subnet, error) {
 	}
 
 	subnet := &types.Subnet{
-		ID:          sc.Networks[models.Tahoe.String()].SubnetID.String(),
+		ID:          sc.Networks[models.Fuji.String()].SubnetID.String(),
 		Alias:       sc.Name,
 		Homepage:    homepage,
 		Description: desc,
@@ -432,6 +432,17 @@ func getVMInfo(sc *models.Sidecar) (*types.VM, error) {
 			return nil, err
 		}
 
+	case sc.VM == models.SpacesVM:
+		vmID = models.SpacesVM
+		desc = "Authenticated, hierarchical storage of arbitrary keys/values using any EIP-712 compatible wallet."
+		dl := binutils.NewSpacesVMDownloader()
+		maintrs, ver, url, sha, err = getInfoForKnownVMs(
+			sc.VMVersion,
+			constants.SpacesVMRepoName,
+			app.GetSpacesVMBinDir(),
+			constants.SpacesVMBin,
+			dl,
+		)
 	case sc.VM == models.SubnetEvm:
 		vmID = models.SubnetEvm
 		dl := binutils.NewSubnetEVMDownloader()

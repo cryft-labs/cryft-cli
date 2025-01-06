@@ -20,9 +20,7 @@
 
 # ignore GoLand metafiles directory
 .idea/
-node_config.tf
 
-inventories/
 *logs/
 
 .vscode*
@@ -31,8 +29,8 @@ inventories/
 
 bin/
 build/
-metal-cli
-metal
+avalanche-cli
+avalanche
 
 dist/
 bin/
@@ -43,5 +41,3 @@ tests/e2e/hardhat/node_modules/
 tests/e2e/hardhat/typechain
 tests/e2e/hardhat/dynamic_conf.json
 tests/e2e/hardhat/greeter.json
-
-tests/e2e/ledgerSim/node_modules/

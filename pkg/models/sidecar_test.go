@@ -6,7 +6,7 @@ package models
 import (
 	"testing"
 
-	"github.com/MetalBlockchain/metal-network-runner/utils"
+	"github.com/ava-labs/avalanche-network-runner/utils"
 	"github.com/stretchr/testify/require"
 )
 

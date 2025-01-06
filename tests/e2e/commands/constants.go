@@ -4,13 +4,9 @@
 package commands
 
 const (
-	CLIBinary                     = "./bin/metal"
-	SubnetCmd                     = "subnet"
-	NetworkCmd                    = "network"
-	KeyCmd                        = "key"
-	UpgradeCmd                    = "upgrade"
-	ElasticTransformCmd           = "elastic"
-	JoinCmd                       = "join"
-	RemoveValidatorCmd            = "removeValidator"
-	AddPermissionlessDelegatorCmd = "addPermissionlessDelegator"
+	CLIBinary  = "./build/cryft-cli"
+	SubnetCmd  = "subnet"
+	NetworkCmd = "network"
+	KeyCmd     = "key"
+	UpgradeCmd = "upgrade"
 )

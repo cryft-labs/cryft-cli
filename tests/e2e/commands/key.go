@@ -4,8 +4,6 @@ package commands
 
 import (
 	"os/exec"
-
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
 )
 
 /* #nosec G204 */
@@ -16,7 +14,6 @@ func CreateKey(keyName string) (string, error) {
 		KeyCmd,
 		"create",
 		keyName,
-		"--"+constants.SkipUpdateFlag,
 	)
 
 	out, err := cmd.Output()
@@ -33,7 +30,6 @@ func CreateKeyFromPath(keyName string, keyPath string) (string, error) {
 		"--file",
 		keyPath,
 		keyName,
-		"--"+constants.SkipUpdateFlag,
 	)
 	out, err := cmd.Output()
 	return string(out), err
@@ -48,7 +44,6 @@ func CreateKeyForce(keyName string) (string, error) {
 		"create",
 		keyName,
 		"--force",
-		"--"+constants.SkipUpdateFlag,
 	)
 
 	out, err := cmd.Output()
@@ -56,15 +51,15 @@ func CreateKeyForce(keyName string) (string, error) {
 }
 
 /* #nosec G204 */
-func ListKeys(network string, omitCChain bool, useNanoAvax bool) (string, error) {
-	args := []string{KeyCmd, "list", "--" + network, "--" + constants.SkipUpdateFlag}
-	if omitCChain {
-		args = append(args, "--cchain=false")
-	}
-	if useNanoAvax {
-		args = append(args, "--use-nano-avax=true")
-	}
-	cmd := exec.Command(CLIBinary, args...)
+func ListKeys() (string, error) {
+	// Create config
+	cmd := exec.Command(
+		CLIBinary,
+		KeyCmd,
+		"list",
+		"--mainnet",
+	)
+
 	out, err := cmd.Output()
 	return string(out), err
 }
@@ -78,7 +73,6 @@ func DeleteKey(keyName string) (string, error) {
 		"delete",
 		keyName,
 		"--force",
-		"--"+constants.SkipUpdateFlag,
 	)
 
 	out, err := cmd.Output()
@@ -93,7 +87,6 @@ func ExportKey(keyName string) (string, error) {
 		KeyCmd,
 		"export",
 		keyName,
-		"--"+constants.SkipUpdateFlag,
 	)
 
 	out, err := cmd.Output()
@@ -110,57 +103,8 @@ func ExportKeyToFile(keyName string, outputPath string) (string, error) {
 		keyName,
 		"-o",
 		outputPath,
-		"--"+constants.SkipUpdateFlag,
 	)
 
 	out, err := cmd.Output()
-	return string(out), err
-}
-
-/* #nosec G204 */
-func KeyTransferSend(keyName string, targetAddr string, amount string) (string, error) {
-	// Create config
-	args := []string{
-		KeyCmd,
-		"transfer",
-		"--local",
-		"--key",
-		keyName,
-		"--send",
-		"--target-addr",
-		targetAddr,
-		"--amount",
-		amount,
-		"--fund-p-chain",
-		"--force",
-		"--" + constants.SkipUpdateFlag,
-	}
-	cmd := exec.Command(CLIBinary, args...)
-
-	out, err := cmd.CombinedOutput()
-	return string(out), err
-}
-
-/* #nosec G204 */
-func KeyTransferReceive(keyName string, amount string, recoveryStep string) (string, error) {
-	// Create config
-	args := []string{
-		KeyCmd,
-		"transfer",
-		"--local",
-		"--key",
-		keyName,
-		"--receive",
-		"--amount",
-		amount,
-		"--fund-p-chain",
-		"--force",
-		"--receive-recovery-step",
-		recoveryStep,
-		"--" + constants.SkipUpdateFlag,
-	}
-	cmd := exec.Command(CLIBinary, args...)
-
-	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

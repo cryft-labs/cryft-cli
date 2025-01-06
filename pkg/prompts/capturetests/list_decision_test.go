@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

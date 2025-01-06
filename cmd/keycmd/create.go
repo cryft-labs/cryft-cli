@@ -6,9 +6,9 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/cryft-labs/cryft-cli/pkg/key"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/key"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +44,17 @@ func createKey(_ *cobra.Command, args []string) error {
 			return err
 		}
 		ux.Logger.PrintToUser("Key created")
+		networks := []models.Network{models.Fuji, models.Mainnet}
+		cchain := true
+		pClients, cClients, err := getClients(networks, cchain)
+		if err != nil {
+			return err
+		}
+		addrInfos, err := getStoredKeyInfo(pClients, cClients, networks, keyPath, cchain)
+		if err != nil {
+			return err
+		}
+		printAddrInfos(addrInfos)
 	} else {
 		// Load key from file
 		// TODO add validation that key is legal
@@ -51,21 +62,7 @@ func createKey(_ *cobra.Command, args []string) error {
 		if err := app.CopyKeyFile(filename, keyName); err != nil {
 			return err
 		}
-		keyPath := app.GetKeyPath(keyName)
 		ux.Logger.PrintToUser("Key loaded")
-		networks := []models.Network{models.NewTahoeNetwork(), models.NewMainnetNetwork()}
-		pchain := true
-		cchain := true
-		xchain := true
-		pClients, xClients, cClients, evmClients, err := getClients(networks, pchain, cchain, xchain, "")
-		if err != nil {
-			return err
-		}
-		addrInfos, err := getStoredKeyInfo(pClients, xClients, cClients, evmClients, networks, keyPath)
-		if err != nil {
-			return err
-		}
-		printAddrInfos(addrInfos)
 	}
 
 	return nil

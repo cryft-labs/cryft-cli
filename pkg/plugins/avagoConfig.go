@@ -10,20 +10,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 )
 
 // Edits an Avalanchego config file or creates one if it doesn't exist. Contains prompts unless forceWrite is set to true.
 func EditConfigFile(
 	app *application.Avalanche,
 	subnetID string,
-	network models.Network,
+	networkID string,
 	configFile string,
 	forceWrite bool,
-	subnetAvagoConfigFile string,
 ) error {
 	if !forceWrite {
 		warn := "This will edit your existing config file. This edit is nondestructive,\n" +
@@ -50,31 +48,8 @@ func EditConfigFile(
 		return fmt.Errorf("failed to unpack the config file %s to JSON: %w", configFile, err)
 	}
 
-	if subnetAvagoConfigFile != "" {
-		subnetAvagoConfigFileBytes, err := os.ReadFile(subnetAvagoConfigFile)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("failed to load extra flags from subnet avago config file %s: %w", subnetAvagoConfigFile, err)
-		}
-		var subnetAvagoConfig map[string]interface{}
-		if err := json.Unmarshal(subnetAvagoConfigFileBytes, &subnetAvagoConfig); err != nil {
-			return fmt.Errorf("failed to unpack the config file %s to JSON: %w", subnetAvagoConfigFile, err)
-		}
-		for k, v := range subnetAvagoConfig {
-			if k == "track-subnets" || k == "whitelisted-subnets" {
-				ux.Logger.PrintToUser("ignoring configuration setting for %q, a subnet's avago conf should not change it", k)
-				continue
-			}
-			avagoConfig[k] = v
-		}
-	}
-
-	// Banff.10: "track-subnets" instead of "whitelisted-subnets"
-	oldVal := avagoConfig["track-subnets"]
-	if oldVal == nil {
-		// check the old key in the config file for tracked-subnets
-		oldVal = avagoConfig["whitelisted-subnets"]
-	}
-
+	// check the old entries in the config file for whitelisted subnets
+	oldVal := avagoConfig["whitelisted-subnets"]
 	newVal := ""
 	if oldVal != nil {
 		// if an entry already exists, we check if the subnetID already is part
@@ -101,11 +76,8 @@ func EditConfigFile(
 		// there were no entries yet, so add this subnet as its new value
 		newVal = subnetID
 	}
-
-	// Banf.10 changes from "whitelisted-subnets" to "track-subnets"
-	delete(avagoConfig, "whitelisted-subnets")
-	avagoConfig["track-subnets"] = newVal
-	avagoConfig["network-id"] = network.NetworkIDFlagValue()
+	avagoConfig["whitelisted-subnets"] = newVal
+	avagoConfig["network-id"] = networkID
 
 	writeBytes, err := json.MarshalIndent(avagoConfig, "", "  ")
 	if err != nil {

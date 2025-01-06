@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MetalBlockchain/metalgo/utils/formatting"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // saves a given [tx] to [txPath]
 func SaveToDisk(tx *txs.Tx, txPath string, forceOverwrite bool) error {
 	// Serialize the signed tx
-	txBytes, err := txs.Codec.Marshal(txs.CodecVersion, tx)
+	txBytes, err := txs.Codec.Marshal(txs.Version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal signed tx: %w", err)
 	}

@@ -6,85 +6,44 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
-	"time"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/statemachine"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/snow"
-	"github.com/shubhamdubey02/subnet-evm/core"
-	"github.com/shubhamdubey02/subnet-evm/params"
-	"github.com/shubhamdubey02/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/shubhamdubey02/subnet-evm/utils"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/statemachine"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var versionComments = map[string]string{
-	"v0.6.0-fuji": " (recommended for fuji durango)",
-}
-
-func CreateEvmSubnetConfig(
-	app *application.Avalanche,
-	subnetName string,
-	genesisPath string,
-	subnetEVMVersion string,
-	getRPCVersionFromBinary bool,
-	subnetEVMChainID uint64,
-	subnetEVMTokenSymbol string,
-	useSubnetEVMDefaults bool,
-	useWarp bool,
-) ([]byte, *models.Sidecar, error) {
+func CreateEvmSubnetConfig(app *application.Avalanche, subnetName string, genesisPath string, subnetEVMVersion string) ([]byte, *models.Sidecar, error) {
 	var (
 		genesisBytes []byte
 		sc           *models.Sidecar
 		err          error
-		rpcVersion   int
 	)
 
-	subnetEVMVersion, err = getVMVersion(app, "Subnet-EVM", constants.SubnetEVMRepoName, subnetEVMVersion)
-	if err != nil {
-		return nil, &models.Sidecar{}, err
-	}
-
-	if getRPCVersionFromBinary {
-		_, vmBin, err := binutils.SetupSubnetEVM(app, subnetEVMVersion)
-		if err != nil {
-			return nil, &models.Sidecar{}, fmt.Errorf("failed to install subnet-evm: %w", err)
-		}
-		rpcVersion, err = GetVMBinaryProtocolVersion(vmBin)
-		if err != nil {
-			return nil, &models.Sidecar{}, fmt.Errorf("unable to get RPC version: %w", err)
-		}
-	} else {
-		rpcVersion, err = GetRPCProtocolVersion(app, models.SubnetEvm, subnetEVMVersion)
-		if err != nil {
-			return nil, &models.Sidecar{}, err
-		}
-	}
-
 	if genesisPath == "" {
-		genesisBytes, sc, err = createEvmGenesis(
-			app,
-			subnetName,
-			subnetEVMVersion,
-			rpcVersion,
-			subnetEVMChainID,
-			subnetEVMTokenSymbol,
-			useSubnetEVMDefaults,
-			useWarp,
-		)
+		genesisBytes, sc, err = createEvmGenesis(app, subnetName, subnetEVMVersion)
 		if err != nil {
 			return nil, &models.Sidecar{}, err
 		}
 	} else {
-		ux.Logger.PrintToUser("importing genesis for subnet %s", subnetName)
+		ux.Logger.PrintToUser("Importing genesis")
 		genesisBytes, err = os.ReadFile(genesisPath)
+		if err != nil {
+			return nil, &models.Sidecar{}, err
+		}
+
+		subnetEVMVersion, _, err = getVMVersion(app, "Subnet-EVM", constants.SubnetEVMRepoName, subnetEVMVersion, false)
+		if err != nil {
+			return nil, &models.Sidecar{}, err
+		}
+
+		rpcVersion, err := GetRPCProtocolVersion(app, models.SubnetEvm, subnetEVMVersion)
 		if err != nil {
 			return nil, &models.Sidecar{}, err
 		}
@@ -95,6 +54,7 @@ func CreateEvmSubnetConfig(
 			VMVersion:  subnetEVMVersion,
 			RPCVersion: rpcVersion,
 			Subnet:     subnetName,
+			TokenName:  "",
 		}
 	}
 
@@ -105,24 +65,11 @@ func createEvmGenesis(
 	app *application.Avalanche,
 	subnetName string,
 	subnetEVMVersion string,
-	rpcVersion int,
-	subnetEVMChainID uint64,
-	subnetEVMTokenSymbol string,
-	useSubnetEVMDefaults bool,
-	useWarp bool,
 ) ([]byte, *models.Sidecar, error) {
-	ux.Logger.PrintToUser("creating genesis for subnet %s", subnetName)
+	ux.Logger.PrintToUser("creating subnet %s", subnetName)
 
 	genesis := core.Genesis{}
 	conf := params.SubnetEVMDefaultChainConfig
-
-	conf.NetworkUpgrades = params.NetworkUpgrades{
-		SubnetEVMTimestamp: utils.NewUint64(0),
-		DurangoTimestamp:   utils.NewUint64(uint64(time.Now().Unix())),
-	}
-	conf.AvalancheContext = params.AvalancheContext{
-		SnowCtx: &snow.Context{},
-	}
 
 	const (
 		descriptorsState = "descriptors"
@@ -132,11 +79,12 @@ func createEvmGenesis(
 	)
 
 	var (
-		chainID     *big.Int
-		tokenSymbol string
-		allocation  core.GenesisAlloc
-		direction   statemachine.StateDirection
-		err         error
+		chainID    *big.Int
+		tokenName  string
+		vmVersion  string
+		allocation core.GenesisAlloc
+		direction  statemachine.StateDirection
+		err        error
 	)
 
 	subnetEvmState, err := statemachine.NewStateMachine(
@@ -148,13 +96,13 @@ func createEvmGenesis(
 	for subnetEvmState.Running() {
 		switch subnetEvmState.CurrentState() {
 		case descriptorsState:
-			chainID, tokenSymbol, direction, err = getDescriptors(app, subnetEVMChainID, subnetEVMTokenSymbol)
+			chainID, tokenName, vmVersion, direction, err = getDescriptors(app, subnetEVMVersion)
 		case feeState:
-			*conf, direction, err = GetFeeConfig(*conf, app, useSubnetEVMDefaults)
+			*conf, direction, err = GetFeeConfig(*conf, app)
 		case airdropState:
-			allocation, direction, err = getEVMAllocation(app, subnetName, useSubnetEVMDefaults, tokenSymbol)
+			allocation, direction, err = getEVMAllocation(app)
 		case precompilesState:
-			*conf, direction, err = getPrecompiles(*conf, app, useSubnetEVMDefaults, useWarp)
+			*conf, direction, err = getPrecompiles(*conf, app)
 		default:
 			err = errors.New("invalid creation stage")
 		}
@@ -164,15 +112,8 @@ func createEvmGenesis(
 		subnetEvmState.NextState(direction)
 	}
 
-	if conf != nil && conf.GenesisPrecompiles[txallowlist.ConfigKey] != nil {
-		allowListCfg, ok := conf.GenesisPrecompiles[txallowlist.ConfigKey].(*txallowlist.Config)
-		if !ok {
-			return nil, nil, fmt.Errorf("expected config of type txallowlist.AllowListConfig, but got %T", allowListCfg)
-		}
-
-		if err := ensureAdminsHaveBalance(
-			allowListCfg.AdminAddresses,
-			allocation); err != nil {
+	if conf != nil && conf.TxAllowListConfig != nil {
+		if err := ensureAdminsHaveBalance(conf.TxAllowListConfig.AllowListAdmins, allocation); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -182,11 +123,7 @@ func createEvmGenesis(
 	genesis.Alloc = allocation
 	genesis.Config = conf
 	genesis.Difficulty = Difficulty
-	genesis.GasLimit = conf.FeeConfig.GasLimit.Uint64()
-
-	if err := genesis.Verify(); err != nil {
-		return nil, nil, err
-	}
+	genesis.GasLimit = GasLimit
 
 	jsonBytes, err := genesis.MarshalJSON()
 	if err != nil {
@@ -199,14 +136,18 @@ func createEvmGenesis(
 		return nil, nil, err
 	}
 
+	rpcVersion, err := GetRPCProtocolVersion(app, models.SubnetEvm, vmVersion)
+	if err != nil {
+		return nil, &models.Sidecar{}, err
+	}
+
 	sc := &models.Sidecar{
-		Name:        subnetName,
-		VM:          models.SubnetEvm,
-		VMVersion:   subnetEVMVersion,
-		RPCVersion:  rpcVersion,
-		Subnet:      subnetName,
-		TokenSymbol: tokenSymbol,
-		TokenName:   tokenSymbol + " Token",
+		Name:       subnetName,
+		VM:         models.SubnetEvm,
+		VMVersion:  vmVersion,
+		RPCVersion: rpcVersion,
+		Subnet:     subnetName,
+		TokenName:  tokenName,
 	}
 
 	return prettyJSON.Bytes(), sc, nil
@@ -229,106 +170,6 @@ func ensureAdminsHaveBalance(admins []common.Address, alloc core.GenesisAlloc) e
 }
 
 // In own function to facilitate testing
-func getEVMAllocation(app *application.Avalanche, subnetName string, useDefaults bool, tokenSymbol string) (core.GenesisAlloc, statemachine.StateDirection, error) {
-	return getAllocation(
-		app,
-		subnetName,
-		defaultEvmAirdropAmount,
-		oneAvax,
-		fmt.Sprintf("Amount to airdrop (in %s units)", tokenSymbol),
-		useDefaults,
-	)
-}
-
-func getVMVersion(
-	app *application.Avalanche,
-	vmName string,
-	repoName string,
-	vmVersion string,
-) (string, error) {
-	var err error
-	switch vmVersion {
-	case "latest":
-		vmVersion, err = app.Downloader.GetLatestReleaseVersion(binutils.GetGithubLatestReleaseURL(
-			constants.AvaLabsOrg,
-			repoName,
-		))
-		if err != nil {
-			return "", err
-		}
-	case "pre-release":
-		vmVersion, err = app.Downloader.GetLatestPreReleaseVersion(
-			constants.AvaLabsOrg,
-			repoName,
-		)
-		if err != nil {
-			return "", err
-		}
-	case "":
-		vmVersion, err = askForVMVersion(app, vmName, repoName)
-		if err != nil {
-			return "", err
-		}
-	}
-	return vmVersion, nil
-}
-
-func askForVMVersion(
-	app *application.Avalanche,
-	vmName string,
-	repoName string,
-) (string, error) {
-	latestReleaseVersion, err := app.Downloader.GetLatestReleaseVersion(binutils.GetGithubLatestReleaseURL(
-		constants.AvaLabsOrg,
-		repoName,
-	))
-	if err != nil {
-		return "", err
-	}
-	latestPreReleaseVersion, err := app.Downloader.GetLatestPreReleaseVersion(
-		constants.AvaLabsOrg,
-		repoName,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	useCustom := "Specify custom version"
-	useLatestRelease := "Use latest release version" + versionComments[latestReleaseVersion]
-	useLatestPreRelease := "Use latest pre-release version" + versionComments[latestPreReleaseVersion]
-
-	defaultPrompt := fmt.Sprintf("What version of %s would you like?", vmName)
-
-	versionOptions := []string{useLatestRelease, useCustom}
-	if latestPreReleaseVersion != latestReleaseVersion {
-		versionOptions = []string{useLatestPreRelease, useLatestRelease, useCustom}
-	}
-
-	versionOption, err := app.Prompt.CaptureList(
-		defaultPrompt,
-		versionOptions,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	if versionOption == useLatestPreRelease {
-		return latestPreReleaseVersion, err
-	}
-
-	if versionOption == useLatestRelease {
-		return latestReleaseVersion, err
-	}
-
-	// prompt for version
-	versions, err := app.Downloader.GetAllReleasesForRepo(constants.AvaLabsOrg, constants.SubnetEVMRepoName)
-	if err != nil {
-		return "", err
-	}
-	version, err := app.Prompt.CaptureList("Pick the version for this VM", versions)
-	if err != nil {
-		return "", err
-	}
-
-	return version, nil
+func getEVMAllocation(app *application.Avalanche) (core.GenesisAlloc, statemachine.StateDirection, error) {
+	return getAllocation(app, defaultEvmAirdropAmount, oneAvax, "Amount to airdrop (in AVAX units)")
 }

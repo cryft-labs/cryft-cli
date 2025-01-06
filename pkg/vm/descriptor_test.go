@@ -8,10 +8,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +32,7 @@ func Test_getChainId(t *testing.T) {
 
 	mockPrompt.On("CaptureString", mock.Anything).Return(testToken, nil)
 
-	token, err := getTokenSymbol(app, "")
+	token, err := getTokenName(app)
 	require.NoError(err)
 	require.Equal(testToken, token)
 }
@@ -46,6 +46,6 @@ func Test_getChainId_Err(t *testing.T) {
 	testErr := errors.New("Bad prompt")
 	mockPrompt.On("CaptureString", mock.Anything).Return("", testErr)
 
-	_, err := getTokenSymbol(app, "")
+	_, err := getTokenName(app)
 	require.ErrorIs(testErr, err)
 }

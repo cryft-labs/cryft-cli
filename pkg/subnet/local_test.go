@@ -11,18 +11,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/config"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metal-network-runner/client"
-	"github.com/MetalBlockchain/metal-network-runner/rpcpb"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
-	"github.com/MetalBlockchain/metalgo/utils/perms"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/config"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-network-runner/client"
+	"github.com/ava-labs/avalanche-network-runner/rpcpb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -60,10 +59,7 @@ var (
 					ChainId: testBlockChainID2,
 				},
 			},
-			Subnets: map[string]*rpcpb.SubnetInfo{
-				testSubnetID1: {},
-				testSubnetID2: {},
-			},
+			Subnets: []string{testSubnetID1, testSubnetID2},
 		},
 	}
 )
@@ -93,7 +89,7 @@ func TestDeployToLocal(t *testing.T) {
 	app := &application.Avalanche{}
 	app.Setup(testDir, logging.NoLog{}, config.New(), prompts.NewPrompter(), application.NewDownloader())
 
-	binDir := filepath.Join(app.GetAvalanchegoBinDir(), "metalgo-"+avagoVersion)
+	binDir := filepath.Join(app.GetAvalanchegoBinDir(), "avalanchego-"+avagoVersion)
 
 	// create a dummy plugins dir, deploy will check it exists
 	binChecker := &mocks.BinaryChecker{}
@@ -101,7 +97,7 @@ func TestDeployToLocal(t *testing.T) {
 	require.NoError(err)
 
 	// create a dummy avalanchego file, deploy will check it exists
-	f, err := os.Create(filepath.Join(binDir, "metalgo"))
+	f, err := os.Create(filepath.Join(binDir, "avalanchego"))
 	require.NoError(err)
 	defer func() {
 		_ = f.Close()
@@ -140,17 +136,17 @@ func TestDeployToLocal(t *testing.T) {
 	err = os.WriteFile(testSidecar.Name(), []byte(sidecar), constants.DefaultPerms755)
 	require.NoError(err)
 	// test actual deploy
-	deployInfo, err := testDeployer.DeployToLocalNetwork(testChainName, []byte(genesis), testGenesis.Name(), "")
+	s, b, err := testDeployer.DeployToLocalNetwork(testChainName, []byte(genesis), testGenesis.Name())
 	require.NoError(err)
-	require.Equal(testSubnetID2, deployInfo.SubnetID.String())
-	require.Equal(testBlockChainID2, deployInfo.BlockchainID.String())
+	require.Equal(testSubnetID2, s.String())
+	require.Equal(testBlockChainID2, b.String())
 }
 
 func TestGetLatestAvagoVersion(t *testing.T) {
 	require := setupTest(t)
 
 	testVersion := "v1.99.9999"
-	testHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := fmt.Sprintf(`{"some":"unimportant","fake":"data","tag_name":"%s","tag_name_was":"what we are interested in"}`, testVersion)
 		_, err := w.Write([]byte(resp))
 		require.NoError(err)
@@ -164,7 +160,7 @@ func TestGetLatestAvagoVersion(t *testing.T) {
 	require.Equal(v, testVersion)
 }
 
-func getTestClientFunc(...binutils.GRPCClientOpOption) (client.Client, error) {
+func getTestClientFunc() (client.Client, error) {
 	c := &mocks.Client{}
 	fakeLoadSnapshotResponse := &rpcpb.LoadSnapshotResponse{}
 	fakeSaveSnapshotResponse := &rpcpb.SaveSnapshotResponse{}
@@ -191,6 +187,6 @@ func getTestClientFunc(...binutils.GRPCClientOpOption) (client.Client, error) {
 	return c, nil
 }
 
-func fakeSetDefaultSnapshot(string, bool, string, bool) (bool, error) {
-	return false, nil
+func fakeSetDefaultSnapshot(string, bool) error {
+	return nil
 }

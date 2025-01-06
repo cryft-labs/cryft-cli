@@ -6,8 +6,8 @@ package apm
 import (
 	"fmt"
 
-	"github.com/cryft-labs/cryft-cli/tests/e2e/commands"
-	"github.com/cryft-labs/cryft-cli/tests/e2e/utils"
+	"github.com/ava-labs/avalanche-cli/tests/e2e/commands"
+	"github.com/ava-labs/avalanche-cli/tests/e2e/utils"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("[APM]", func() {
 	ginkgo.BeforeEach(func() {
 		// TODO this is a bit coarse, but I'm not sure a better solution is possible
 		// without modifications to the APM.
-		// More details: https://github.com/cryft-labs/cryft-cli/issues/244
+		// More details: https://github.com/ava-labs/avalanche-cli/issues/244
 		utils.RemoveAPMRepo()
 	})
 
@@ -46,14 +46,12 @@ var _ = ginkgo.Describe("[APM]", func() {
 		utils.RemoveAPMRepo()
 	})
 
-	ginkgo.It("can import from metal-core", func() {
-		ginkgo.Skip("TODO")
-		repo := "MetalBlockchain/metal-plugins-core"
+	ginkgo.It("can import from avalanche-core", func() {
+		repo := "ava-labs/avalanche-plugins-core"
 		commands.ImportSubnetConfig(repo, subnet1)
 	})
 
 	ginkgo.It("can import from url", func() {
-		ginkgo.Skip("TODO")
 		branch := "master"
 		commands.ImportSubnetConfigFromURL(testRepo, branch, subnet2)
 	})

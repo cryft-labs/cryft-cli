@@ -4,10 +4,10 @@
 package plugins
 
 import (
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func ManualUpgrade(app *application.Avalanche, sc models.Sidecar, targetVersion string) error {
@@ -45,7 +45,7 @@ func AutomatedUpgrade(app *application.Avalanche, sc models.Sidecar, targetVersi
 			}
 		}
 		if pluginDir == "" {
-			pluginDir, err = app.Prompt.CaptureString("Path to your metalgo plugin dir (likely ~/.metalgo/build/plugins)")
+			pluginDir, err = app.Prompt.CaptureString("Path to your avalanchego plugin dir (likely ~/.avalanchego/build/plugins)")
 			if err != nil {
 				return err
 			}
@@ -81,8 +81,8 @@ To upgrade your node, you must do three things:
 
 To add the VM to your plugin directory, copy or scp from %s
 
-If you installed metalgo with the install script, your plugin directory is likely
-~/.metalgo/build/plugins.
+If you installed avalanchego with the install script, your plugin directory is likely
+~/.avalanchego/build/plugins.
 `
 
 	ux.Logger.PrintToUser(msg, vmPath)

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestUpdateSideCar(t *testing.T) {
 	sc := &models.Sidecar{
 		Name:      "TEST",
 		VM:        models.SubnetEvm,
-		TokenName: "Test Token",
+		TokenName: "TEST",
 		ChainID:   "42",
 	}
 
@@ -131,7 +131,7 @@ func Test_createSidecar_success(t *testing.T) {
 			name:              "no token name",
 			subnetName:        subnetName1,
 			tokenName:         "",
-			expectedTokenName: "Test Token",
+			expectedTokenName: "TEST",
 			chainID:           "888",
 		},
 	}
@@ -193,11 +193,10 @@ func Test_loadSidecar_success(t *testing.T) {
 
 	// Check contents
 	expectedSc := models.Sidecar{
-		Name:        subnetName1,
-		VM:          vm,
-		Subnet:      subnetName1,
-		TokenName:   constants.DefaultTokenName,
-		TokenSymbol: constants.DefaultTokenSymbol,
+		Name:      subnetName1,
+		VM:        vm,
+		Subnet:    subnetName1,
+		TokenName: constants.DefaultTokenName,
 	}
 
 	sc, err := ap.LoadSidecar(subnetName1)

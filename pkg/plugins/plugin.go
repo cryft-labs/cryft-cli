@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/MetalBlockchain/metal-network-runner/utils"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-network-runner/utils"
 )
 
 func SanitizePath(path string) (string, error) {
@@ -52,9 +52,14 @@ func CreatePlugin(app *application.Avalanche, subnetName string, pluginDir strin
 
 		switch sc.VM {
 		case models.SubnetEvm:
-			_, vmSourcePath, err = binutils.SetupSubnetEVM(app, sc.VMVersion)
+			vmSourcePath, err = binutils.SetupSubnetEVM(app, sc.VMVersion)
 			if err != nil {
 				return "", fmt.Errorf("failed to install subnet-evm: %w", err)
+			}
+		case models.SpacesVM:
+			vmSourcePath, err = binutils.SetupSpacesVM(app, sc.VMVersion)
+			if err != nil {
+				return "", fmt.Errorf("failed to install spaces-vm: %w", err)
 			}
 		case models.CustomVM:
 			vmSourcePath = binutils.SetupCustomBin(app, subnetName)
@@ -82,9 +87,14 @@ func CreatePluginFromVersion(
 
 	switch vm {
 	case models.SubnetEvm:
-		_, vmSourcePath, err = binutils.SetupSubnetEVM(app, version)
+		vmSourcePath, err = binutils.SetupSubnetEVM(app, version)
 		if err != nil {
 			return "", fmt.Errorf("failed to install subnet-evm: %w", err)
+		}
+	case models.SpacesVM:
+		vmSourcePath, err = binutils.SetupSpacesVM(app, version)
+		if err != nil {
+			return "", fmt.Errorf("failed to install spaces-vm: %w", err)
 		}
 	case models.CustomVM:
 		vmSourcePath = binutils.SetupCustomBin(app, subnetName)

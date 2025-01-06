@@ -3,10 +3,9 @@
 package main
 
 import (
-	"github.com/cryft-labs/cryft-cli/cmd"
+	"github.com/ava-labs/avalanche-cli/cmd"
 )
 
 func main() {
-	// echo "Downloading dependencies..."
 	cmd.Execute()
 }

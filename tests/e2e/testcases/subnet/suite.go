@@ -4,8 +4,8 @@
 package subnet
 
 import (
-	"github.com/cryft-labs/cryft-cli/tests/e2e/commands"
-	"github.com/cryft-labs/cryft-cli/tests/e2e/utils"
+	"github.com/ava-labs/avalanche-cli/tests/e2e/commands"
+	"github.com/ava-labs/avalanche-cli/tests/e2e/utils"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -26,6 +26,11 @@ var _ = ginkgo.Describe("[Subnet]", ginkgo.Ordered, func() {
 
 	ginkgo.It("can create and delete a subnet evm config", func() {
 		commands.CreateSubnetEvmConfig(subnetName, utils.SubnetEvmGenesisPath)
+		commands.DeleteSubnetConfig(subnetName)
+	})
+
+	ginkgo.It("can create and delete a spacesvm config", func() {
+		commands.CreateSpacesVMConfig(subnetName, utils.SpacesVMGenesisPath)
 		commands.DeleteSubnetConfig(subnetName)
 	})
 

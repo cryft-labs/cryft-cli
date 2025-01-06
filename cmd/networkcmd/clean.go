@@ -7,13 +7,10 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/cryft-labs/cryft-cli/pkg/elasticsubnet"
-
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 	"github.com/shirou/gopsutil/process"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -37,7 +34,7 @@ configuration.`,
 		&hard,
 		"hard",
 		false,
-		"Also clean downloaded metalgo and plugin binaries",
+		"Also clean downloaded avalanchego and plugin binaries",
 	)
 
 	return cmd
@@ -46,29 +43,14 @@ configuration.`,
 func clean(*cobra.Command, []string) error {
 	app.Log.Info("killing gRPC server process...")
 
-	configSingleNodeEnabled := app.Conf.GetConfigBoolValue(constants.ConfigSingleNodeEnabledKey)
-
-	if _, err := subnet.SetDefaultSnapshot(app.GetSnapshotsDir(), true, "", configSingleNodeEnabled); err != nil {
+	if err := subnet.SetDefaultSnapshot(app.GetSnapshotsDir(), true); err != nil {
 		app.Log.Warn("failed resetting default snapshot", zap.Error(err))
-	}
-
-	defaultSnapshotRelayerConfigPath := filepath.Join(app.GetAWMRelayerSnapshotConfsDir(), constants.DefaultSnapshotName+jsonExt)
-	if err := os.RemoveAll(defaultSnapshotRelayerConfigPath); err != nil {
-		return err
 	}
 
 	if err := binutils.KillgRPCServerProcess(app); err != nil {
 		app.Log.Warn("failed killing server process", zap.Error(err))
 	} else {
 		ux.Logger.PrintToUser("Process terminated.")
-	}
-
-	if err := os.RemoveAll(app.GetAWMRelayerConfigPath()); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(app.GetExtraLocalNetworkDataPath()); err != nil {
-		return err
 	}
 
 	if hard {
@@ -78,69 +60,18 @@ func clean(*cobra.Command, []string) error {
 		_ = killAllBackendsByName()
 	}
 
-	if err := app.ResetPluginsDir(); err != nil {
-		return err
-	}
-
-	if err := removeLocalDeployInfoFromSidecars(); err != nil {
-		return err
-	}
-	if err := removeLocalElasticSubnetInfoFromSidecars(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func removeLocalDeployInfoFromSidecars() error {
-	// Remove all local deployment info from sidecar files
-	deployedSubnets, err := subnet.GetLocallyDeployedSubnetsFromFile(app)
+	// Remove all plugins from plugin dir
+	pluginDir := app.GetPluginsDir()
+	installedPlugins, err := os.ReadDir(pluginDir)
 	if err != nil {
 		return err
 	}
-
-	for _, subnet := range deployedSubnets {
-		sc, err := app.LoadSidecar(subnet)
-		if err != nil {
-			return err
-		}
-
-		delete(sc.Networks, models.Local.String())
-		if err = app.UpdateSidecar(&sc); err != nil {
+	for _, plugin := range installedPlugins {
+		if err = os.Remove(filepath.Join(pluginDir, plugin.Name())); err != nil {
 			return err
 		}
 	}
-	return nil
-}
 
-func removeLocalElasticSubnetInfoFromSidecars() error {
-	// Remove all local elastic subnet info from sidecar files
-	elasticSubnets, err := elasticsubnet.GetLocalElasticSubnetsFromFile(app)
-	if err != nil {
-		return err
-	}
-
-	for _, subnet := range elasticSubnets {
-		sc, err := app.LoadSidecar(subnet)
-		if err != nil {
-			return err
-		}
-
-		delete(sc.ElasticSubnet, models.Local.String())
-		if err = app.UpdateSidecar(&sc); err != nil {
-			return err
-		}
-		if err = deleteElasticSubnetConfigFile(subnet); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteElasticSubnetConfigFile(subnetName string) error {
-	elasticSubetConfigPath := app.GetElasticSubnetConfigPath(subnetName)
-	if err := os.Remove(elasticSubetConfigPath); err != nil {
-		return err
-	}
 	return nil
 }
 

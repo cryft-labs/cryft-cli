@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
 )
 
 func CopyFile(src, dest string) error {

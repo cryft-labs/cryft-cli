@@ -10,12 +10,13 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/vm"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/vm"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 )
 
@@ -25,24 +26,6 @@ var (
 
 	_ VersionMapper = &versionMapper{}
 )
-
-/*
-VersionMapper keys and their usage:
- * OnlyAvagoKey: 					Used when running one avalanchego only (no compatibility required)
-
- * MultiAvago1Key					Used for the update scenario where avalanchego is updated and
- * MultiAvago2Key    			both avalanchego versions need to be compatible.
- * MultiAvagoSubnetEVMKey	This is the Subnet-EVM version compatible to the above scenario.
-
- * LatestEVM2AvagoKey 	  Latest subnet-evm version
- * LatestAvago2EVMKey     while this is the latest avalanchego compatible with that subnet-evm
-
- * SoloSubnetEVMKey1 			This is used when we want to test subnet-evm versions where compatibility
- * SoloSubnetEVMKey2      needs to be between the two subnet-evm versions
- 													(latest might not be compatible with second latest)
-
-
-*/
 
 // VersionMapper is an abstraction for retrieving version compatibility URLs
 // allowing unit tests without requiring external http calls.
@@ -55,7 +38,6 @@ type VersionMapper interface {
 	GetApp() *application.Avalanche
 	GetLatestAvagoByProtoVersion(app *application.Avalanche, rpcVersion int, url string) (string, error)
 	GetEligibleVersions(sortedVersions []string, repoName string, app *application.Avalanche) ([]string, error)
-	FilterAvailableVersions(versions []string) []string
 }
 
 // NewVersionMapper returns the default VersionMapper for e2e tests
@@ -75,7 +57,7 @@ type versionMapper struct {
 	app *application.Avalanche
 }
 
-// GetLatestAvagoByProtoVersion returns the latest metalgo version which
+// GetLatestAvagoByProtoVersion returns the latest Avalanchego version which
 // runs with the specified rpcVersion, or an error if it can't be found
 // (or other errors occurred)
 func (*versionMapper) GetLatestAvagoByProtoVersion(app *application.Avalanche, rpcVersion int, url string) (string, error) {
@@ -92,6 +74,8 @@ func (*versionMapper) GetCompatURL(vmType models.VMType) string {
 	switch vmType {
 	case models.SubnetEvm:
 		return constants.SubnetEVMRPCCompatibilityURL
+	case models.SpacesVM:
+		return constants.SpacesVMRPCCompatibilityURL
 	case models.CustomVM:
 		// TODO: unclear yet what we should return here
 		return ""
@@ -100,7 +84,7 @@ func (*versionMapper) GetCompatURL(vmType models.VMType) string {
 	}
 }
 
-// GetAvagoURL returns the compatibility URL for metalgo
+// GetAvagoURL returns the compatibility URL for Avalanchego
 func (*versionMapper) GetAvagoURL() string {
 	return constants.AvalancheGoCompatibilityURL
 }
@@ -126,19 +110,6 @@ func (*versionMapper) GetEligibleVersions(sortedVersions []string, repoName stri
 	}
 
 	return eligible, nil
-}
-
-func (*versionMapper) FilterAvailableVersions(versions []string) []string {
-	availableVersions := []string{}
-	for _, v := range versions {
-		resp, err := binutils.CheckReleaseVersion(logging.NoLog{}, constants.SubnetEVMRepoName, v)
-		if err != nil {
-			continue
-		}
-		availableVersions = append(availableVersions, v)
-		resp.Body.Close()
-	}
-	return availableVersions
 }
 
 // GetVersionMapping returns a map of specific VMs resp. Avalanchego e2e context keys
@@ -172,8 +143,6 @@ func GetVersionMapping(mapper VersionMapper) (map[string]string, error) {
 		return nil, err
 	}
 
-	subnetEVMversions = mapper.FilterAvailableVersions(subnetEVMversions)
-
 	// now get the avalanchego compatibility object
 	avagoCompat, err := getAvagoCompatibility(mapper)
 	if err != nil {
@@ -197,9 +166,9 @@ func GetVersionMapping(mapper VersionMapper) (map[string]string, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(rpcs)))
 
 	// iterate the rpc versions
-	// evaluate two metalgo versions which are consecutive
+	// evaluate two avalanchego versions which are consecutive
 	// and run with the same RPC version.
-	// This is required for the for the "can deploy with multiple metalgo versions" test
+	// This is required for the for the "can deploy with multiple avalanchego versions" test
 	for _, rpcVersion := range rpcs {
 		versionAsString := strconv.Itoa(rpcVersion)
 		versionsForRPC := avagoCompat[versionAsString]
@@ -233,10 +202,10 @@ func GetVersionMapping(mapper VersionMapper) (map[string]string, error) {
 	// now let's look for subnet-evm versions which are fit for the
 	// "can deploy multiple subnet-evm versions" test.
 	// We need two subnet-evm versions which run the same RPC version,
-	// and then a compatible metalgo
+	// and then a compatible Avalanchego
 	//
 	// To avoid having to iterate again, we'll also fill the values
-	// for the **latest** compatible metalgo and Subnet-EVM
+	// for the **latest** compatible Avalanchego and Subnet-EVM
 	for i, ver := range subnetEVMversions {
 		// safety check, should not happen, as we already know
 		// compatible versions exist
@@ -246,7 +215,7 @@ func GetVersionMapping(mapper VersionMapper) (map[string]string, error) {
 		first := ver
 		second := subnetEVMversions[i+1]
 		// we should be able to safely assume that for a given subnet-evm RPC version,
-		// there exists at least one compatible metalgo.
+		// there exists at least one compatible Avalanchego.
 		// This means we can in any case use this to set the **latest** compatibility
 		soloAvago, err := mapper.GetLatestAvagoByProtoVersion(mapper.GetApp(), subnetEVMmapping[first], mapper.GetAvagoURL())
 		if err != nil {
@@ -265,6 +234,35 @@ func GetVersionMapping(mapper VersionMapper) (map[string]string, error) {
 			break
 		}
 	}
+
+	// finally let's do the SpacesVM
+	// this is simpler, we just need the latest and its compatible Avalanchego
+	spacesVMversions, spacesVMmapping, err := getVersions(mapper, models.SpacesVM)
+	if err != nil {
+		return nil, err
+	}
+	// the assumption is that the latest SpacesVM ALWAYS has a compatible avalanchego already
+	latest := spacesVMversions[0]
+	rpc := spacesVMmapping[latest]
+	avago, err := mapper.GetLatestAvagoByProtoVersion(mapper.GetApp(), rpc, mapper.GetAvagoURL())
+	if err != nil {
+		return nil, err
+	}
+	binaryToVersion[Spaces2AvagoKey] = latest
+	binaryToVersion[Avago2SpacesKey] = avago
+
+	mapper.GetApp().Log.Debug("mapping:",
+		zap.String("SoloSubnetEVM1", binaryToVersion[SoloSubnetEVMKey1]),
+		zap.String("SoloSubnetEVM2", binaryToVersion[SoloSubnetEVMKey2]),
+		zap.String("SoloAvago", binaryToVersion[SoloAvagoKey]),
+		zap.String("MultiAvago1", binaryToVersion[MultiAvago1Key]),
+		zap.String("MultiAvago2", binaryToVersion[MultiAvago2Key]),
+		zap.String("MultiAvagoSubnetEVM", binaryToVersion[MultiAvagoSubnetEVMKey]),
+		zap.String("LatestEVM2Avago", binaryToVersion[LatestEVM2AvagoKey]),
+		zap.String("LatestAvago2EVM", binaryToVersion[LatestAvago2EVMKey]),
+		zap.String("Spaces2Avago", binaryToVersion[Spaces2AvagoKey]),
+		zap.String("Avago2Spaces", binaryToVersion[Avago2SpacesKey]),
+	)
 
 	return binaryToVersion, nil
 }
@@ -309,7 +307,7 @@ func getCompatibility(mapper VersionMapper, vmType models.VMType) (models.VMComp
 	return parsedCompat, nil
 }
 
-// getAvagoCompatibility returns the compatibility for metalgo
+// getAvagoCompatibility returns the compatibility for Avalanchego
 func getAvagoCompatibility(mapper VersionMapper) (models.AvagoCompatiblity, error) {
 	avagoBytes, err := mapper.GetApp().GetDownloader().Download(mapper.GetAvagoURL())
 	if err != nil {

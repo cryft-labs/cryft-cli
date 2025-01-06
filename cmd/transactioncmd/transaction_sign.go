@@ -4,16 +4,14 @@ package transactioncmd
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/cryft-labs/cryft-cli/cmd/subnetcmd"
-	"github.com/cryft-labs/cryft-cli/pkg/keychain"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/txutils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
+	"github.com/ava-labs/avalanche-cli/cmd/subnetcmd"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-cli/pkg/txutils"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/spf13/cobra"
 )
 
@@ -72,10 +70,10 @@ func signTx(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	switch network.Kind {
-	case models.Tahoe, models.Local:
+	switch network {
+	case models.Fuji, models.Local:
 		if !useLedger && keyName == "" {
-			useLedger, keyName, err = prompts.GetFujiKeyOrLedger(app.Prompt, "sign transaction", app.GetKeyDir())
+			useLedger, keyName, err = prompts.GetFujiKeyOrLedger(app.Prompt, app.GetKeyDir())
 			if err != nil {
 				return err
 			}
@@ -95,55 +93,34 @@ func signTx(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	subnetID := sc.Networks[network.Name()].SubnetID
+	subnetID := sc.Networks[network.String()].SubnetID
 	if subnetID == ids.Empty {
 		return errNoSubnetID
 	}
-	transferSubnetOwnershipTxID := sc.Networks[network.Name()].TransferSubnetOwnershipTxID
 
-	subnetIDFromTX, err := txutils.GetSubnetID(tx)
-	if err != nil {
-		return err
-	}
-	if subnetIDFromTX != ids.Empty {
-		subnetID = subnetIDFromTX
-	}
-
-	controlKeys, _, err := txutils.GetOwners(network, subnetID, transferSubnetOwnershipTxID)
+	subnetAuthKeys, err := txutils.GetAuthSigners(tx, network, subnetID)
 	if err != nil {
 		return err
 	}
 
-	// get the remaining tx signers so as to check that the wallet does contain an expected signer
-	subnetAuthKeys, remainingSubnetAuthKeys, err := txutils.GetRemainingSigners(tx, controlKeys)
+	remainingSubnetAuthKeys, err := txutils.GetRemainingSigners(tx, network, subnetID)
 	if err != nil {
 		return err
 	}
 
 	if len(remainingSubnetAuthKeys) == 0 {
 		subnetcmd.PrintReadyToSignMsg(subnetName, inputTxPath)
-		ux.Logger.PrintToUser("")
-		return fmt.Errorf("tx is already fully signed")
+		return nil
 	}
 
-	// get keychain accessor
-	kc, err := keychain.GetKeychain(app, false, useLedger, ledgerAddresses, keyName, network, 0)
+	// get keychain accesor
+	kc, err := subnetcmd.GetKeychain(useLedger, ledgerAddresses, keyName, network)
 	if err != nil {
 		return err
 	}
 
-	// add control keys to the keychain whenever possible
-	if err := kc.AddAddresses(controlKeys); err != nil {
-		return err
-	}
-
-	deployer := subnet.NewPublicDeployer(app, kc, network)
-	if err := deployer.Sign(
-		tx,
-		remainingSubnetAuthKeys,
-		subnetID,
-		transferSubnetOwnershipTxID,
-	); err != nil {
+	deployer := subnet.NewPublicDeployer(app, useLedger, kc, network)
+	if err := deployer.Sign(tx, remainingSubnetAuthKeys, subnetID); err != nil {
 		if errors.Is(err, subnet.ErrNoSubnetAuthKeysInWallet) {
 			ux.Logger.PrintToUser("There are no required subnet auth keys present in the wallet")
 			ux.Logger.PrintToUser("")
@@ -151,24 +128,18 @@ func signTx(_ *cobra.Command, args []string) error {
 			for _, addr := range remainingSubnetAuthKeys {
 				ux.Logger.PrintToUser("  %s", addr)
 			}
-			ux.Logger.PrintToUser("")
-			return fmt.Errorf("no remaining signer address present in wallet")
+			return nil
 		}
-		return err
-	}
-
-	// update the remaining tx signers after the signature has been done
-	_, remainingSubnetAuthKeys, err = txutils.GetRemainingSigners(tx, controlKeys)
-	if err != nil {
 		return err
 	}
 
 	if err := subnetcmd.SaveNotFullySignedTx(
 		"Tx",
 		tx,
+		network,
 		subnetName,
+		subnetID,
 		subnetAuthKeys,
-		remainingSubnetAuthKeys,
 		inputTxPath,
 		true,
 	); err != nil {

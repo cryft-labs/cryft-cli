@@ -10,17 +10,17 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/config"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
-	"github.com/MetalBlockchain/metalgo/version"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/binutils"
+	"github.com/ava-labs/avalanche-cli/pkg/config"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,6 +44,13 @@ func TestInfoKnownVMs(t *testing.T) {
 	}
 
 	cases := []testCase{
+		{
+			strVer:   "v0.9.99",
+			repoName: "spacesvm",
+			vmBinDir: vmBinDir,
+			vmBin:    "mySpacesVM",
+			dl:       binutils.NewSpacesVMDownloader(),
+		},
 		{
 			strVer:   "v0.9.99",
 			repoName: "subnet-evm",
@@ -73,7 +80,7 @@ func TestInfoKnownVMs(t *testing.T) {
 		require.NoError(err)
 		// it's kinda useless to create the URL by building it via downloader -
 		// would defeat the purpose of the test
-		expectedURL := "https://github.com/MetalBlockchain/" +
+		expectedURL := "https://github.com/ava-labs/" +
 			c.repoName + "/releases/download/" +
 			c.strVer + "/" + c.repoName + "_" + c.strVer[1:] + "_" +
 			runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
@@ -103,7 +110,7 @@ func TestNoRepoPath(t *testing.T) {
 		Name:      testSubnet,
 		Subnet:    testSubnet,
 		Networks: map[string]models.NetworkData{
-			models.Tahoe.String(): {
+			models.Fuji.String(): {
 				SubnetID:     ids.GenerateTestID(),
 				BlockchainID: ids.GenerateTestID(),
 			},
@@ -213,7 +220,7 @@ func TestCanPublish(t *testing.T) {
 		Name:   "fuji",
 		Subnet: "fuji",
 		Networks: map[string]models.NetworkData{
-			models.Tahoe.String(): {
+			models.Fuji.String(): {
 				SubnetID:     ids.GenerateTestID(),
 				BlockchainID: ids.GenerateTestID(),
 			},
@@ -237,7 +244,7 @@ func TestCanPublish(t *testing.T) {
 		Name:   "both",
 		Subnet: "both",
 		Networks: map[string]models.NetworkData{
-			models.Tahoe.String(): {
+			models.Fuji.String(): {
 				SubnetID:     ids.GenerateTestID(),
 				BlockchainID: ids.GenerateTestID(),
 			},

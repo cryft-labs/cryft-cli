@@ -6,11 +6,13 @@ package vm
 import (
 	"math/big"
 
-	"github.com/shubhamdubey02/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 const (
+	GasLimit = 8_000_000
+
 	defaultEvmAirdropAmount = "1000000000000000000000000"
 	goBackMsg               = "Go back to previous step"
 )

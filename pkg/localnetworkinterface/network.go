@@ -8,8 +8,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/MetalBlockchain/metalgo/api/info"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanchego/api/info"
 )
 
 type StatusChecker interface {
@@ -31,12 +31,12 @@ func (networkStatusChecker) GetCurrentNetworkVersion() (string, int, bool, error
 		return "", 0, false, nil
 	}
 
-	// version is in format metal/x.y.z, need to turn to semantic
+	// version is in format avalanche/x.y.z, need to turn to semantic
 	splitVersion := strings.Split(versionResponse.Version, "/")
 	if len(splitVersion) != 2 {
-		return "", 0, false, errors.New("unable to parse metalgo version " + versionResponse.Version)
+		return "", 0, false, errors.New("unable to parse avalanchego version " + versionResponse.Version)
 	}
-	// index 0 should be metal, index 1 will be version
+	// index 0 should be avalanche, index 1 will be version
 	parsedVersion := "v" + splitVersion[1]
 
 	return parsedVersion, int(versionResponse.RPCProtocolVersion), true, nil

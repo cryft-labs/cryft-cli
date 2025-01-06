@@ -5,10 +5,13 @@ package txutils
 import (
 	"fmt"
 
-	"github.com/MetalBlockchain/metalgo/utils/crypto/secp256k1"
-	"github.com/MetalBlockchain/metalgo/vms/components/verify"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
-	"github.com/MetalBlockchain/metalgo/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // get all subnet auth addresses that are required to sign a given tx
@@ -17,25 +20,18 @@ import (
 //   - creates the string slice of required subnet auth addresses by applying
 //     the indices to the control keys slice
 //
-// expect tx.Unsigned type to be in:
-// - txs.CreateChainTx
-// - txs.AddSubnetValidatorTx
-// - txs.RemoveSubnetValidatorTx
-//
-// controlKeys must be in the same order as in the subnet creation tx (as obtained by GetOwners)
-func GetAuthSigners(tx *txs.Tx, controlKeys []string) ([]string, error) {
+// expect tx.Unsigned type to be in [txs.AddSubnetValidatorTx, txs.CreateChainTx]
+func GetAuthSigners(tx *txs.Tx, network models.Network, subnetID ids.ID) ([]string, error) {
+	controlKeys, _, err := subnet.GetOwners(network, subnetID)
+	if err != nil {
+		return nil, err
+	}
 	unsignedTx := tx.Unsigned
 	var subnetAuth verify.Verifiable
 	switch unsignedTx := unsignedTx.(type) {
-	case *txs.RemoveSubnetValidatorTx:
-		subnetAuth = unsignedTx.SubnetAuth
 	case *txs.AddSubnetValidatorTx:
 		subnetAuth = unsignedTx.SubnetAuth
 	case *txs.CreateChainTx:
-		subnetAuth = unsignedTx.SubnetAuth
-	case *txs.TransformSubnetTx:
-		subnetAuth = unsignedTx.SubnetAuth
-	case *txs.TransferSubnetOwnershipTx:
 		subnetAuth = unsignedTx.SubnetAuth
 	default:
 		return nil, fmt.Errorf("unexpected unsigned tx type %T", unsignedTx)
@@ -58,43 +54,41 @@ func GetAuthSigners(tx *txs.Tx, controlKeys []string) ([]string, error) {
 //   - get the string slice of auth signers for the tx (GetAuthSigners)
 //   - verifies that all creds in tx.Creds, except the last one, are fully signed
 //     (a cred is fully signed if all the signatures in cred.Sigs are non-empty)
-//   - computes remaining signers by iterating the last cred in tx.Creds, associated to subnet auth signing
+//   - computes remaning signers by iterating the last cred in tx.Creds, associated to subnet auth signing
 //   - for each sig in cred.Sig: if sig is empty, then add the associated auth signer address (obtained from
 //     authSigners by using the index) to the remaining signers list
 //
 // if the tx is fully signed, returns empty slice
 // expect tx.Unsigned type to be in [txs.AddSubnetValidatorTx, txs.CreateChainTx]
-//
-// controlKeys must be in the same order as in the subnet creation tx (as obtained by GetOwners)
-func GetRemainingSigners(tx *txs.Tx, controlKeys []string) ([]string, []string, error) {
-	authSigners, err := GetAuthSigners(tx, controlKeys)
+func GetRemainingSigners(tx *txs.Tx, network models.Network, subnetID ids.ID) ([]string, error) {
+	authSigners, err := GetAuthSigners(tx, network, subnetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	emptySig := [secp256k1.SignatureLen]byte{}
+	emptySig := [crypto.SECP256K1RSigLen]byte{}
 	// we should have at least 1 cred for output owners and 1 cred for subnet auth
 	if len(tx.Creds) < 2 {
-		return nil, nil, fmt.Errorf("expected tx.Creds of len 2, got %d", len(tx.Creds))
+		return nil, fmt.Errorf("expected tx.Creds of len 2, got %d", len(tx.Creds))
 	}
 	// signatures for output owners should be filled (all creds except last one)
 	for credIndex := range tx.Creds[:len(tx.Creds)-1] {
 		cred, ok := tx.Creds[credIndex].(*secp256k1fx.Credential)
 		if !ok {
-			return nil, nil, fmt.Errorf("expected cred to be of type *secp256k1fx.Credential, got %T", tx.Creds[credIndex])
+			return nil, fmt.Errorf("expected cred to be of type *secp256k1fx.Credential, got %T", tx.Creds[credIndex])
 		}
 		for i, sig := range cred.Sigs {
 			if sig == emptySig {
-				return nil, nil, fmt.Errorf("expected funding sig %d of cred %d to be filled", i, credIndex)
+				return nil, fmt.Errorf("expected funding sig %d of cred %d to be filled", i, credIndex)
 			}
 		}
 	}
 	// signatures for subnet auth (last cred)
 	cred, ok := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
 	if !ok {
-		return nil, nil, fmt.Errorf("expected cred to be of type *secp256k1fx.Credential, got %T", tx.Creds[1])
+		return nil, fmt.Errorf("expected cred to be of type *secp256k1fx.Credential, got %T", tx.Creds[1])
 	}
 	if len(cred.Sigs) != len(authSigners) {
-		return nil, nil, fmt.Errorf("expected number of cred's signatures %d to equal number of auth signers %d",
+		return nil, fmt.Errorf("expected number of cred's signatures %d to equal number of auth signers %d",
 			len(cred.Sigs),
 			len(authSigners),
 		)
@@ -105,5 +99,5 @@ func GetRemainingSigners(tx *txs.Tx, controlKeys []string) ([]string, []string, 
 			remainingSigners = append(remainingSigners, authSigners[i])
 		}
 	}
-	return authSigners, remainingSigners, nil
+	return remainingSigners, nil
 }

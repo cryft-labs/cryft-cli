@@ -4,14 +4,14 @@
 package vm
 
 import (
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/statemachine"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/shubhamdubey02/subnet-evm/commontype"
-	"github.com/shubhamdubey02/subnet-evm/params"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/statemachine"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/params"
 )
 
-func GetFeeConfig(config params.ChainConfig, app *application.Avalanche, useDefault bool) (
+func GetFeeConfig(config params.ChainConfig, app *application.Avalanche) (
 	params.ChainConfig,
 	statemachine.StateDirection,
 	error,
@@ -32,13 +32,6 @@ func GetFeeConfig(config params.ChainConfig, app *application.Avalanche, useDefa
 		setGasStep                  = "Set block gas cost step"
 	)
 
-	config.FeeConfig = StarterFeeConfig
-
-	if useDefault {
-		config.FeeConfig.TargetGas = slowTarget
-		return config, statemachine.Forward, nil
-	}
-
 	feeConfigOptions := []string{useSlow, useMedium, useFast, customFee, goBackMsg}
 
 	feeDefault, err := app.Prompt.CaptureList(
@@ -48,6 +41,8 @@ func GetFeeConfig(config params.ChainConfig, app *application.Avalanche, useDefa
 	if err != nil {
 		return config, statemachine.Stop, err
 	}
+
+	config.FeeConfig = StarterFeeConfig
 
 	switch feeDefault {
 	case useFast:

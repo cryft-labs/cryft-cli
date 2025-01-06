@@ -7,54 +7,37 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
+	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/binutils"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/keychain"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/networkoptions"
-	"github.com/cryft-labs/cryft-cli/pkg/plugins"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/cryft-labs/cryft-cli/pkg/utils"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metal-network-runner/server"
-	"github.com/MetalBlockchain/metalgo/genesis"
-	"github.com/MetalBlockchain/metalgo/ids"
-	"github.com/MetalBlockchain/metalgo/utils/formatting/address"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm"
-	"github.com/MetalBlockchain/metalgo/vms/secp256k1fx"
+	"github.com/ava-labs/avalanche-cli/cmd/flags"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/plugins"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/spf13/cobra"
 )
 
-const ewoqPChainAddr = "P-custom18jma8ppw3nhx5r4ap8clazz0dps7rv5u9xde7p"
-
 var (
-	joinAllSupportedNetworkOptions        = []networkoptions.NetworkOption{networkoptions.Local, networkoptions.Tahoe, networkoptions.Mainnet, networkoptions.Devnet, networkoptions.Cluster}
-	joinNonElasticSupportedNetworkOptions = []networkoptions.NetworkOption{networkoptions.Local, networkoptions.Tahoe, networkoptions.Mainnet, networkoptions.Devnet, networkoptions.Cluster}
-	joinElasticSupportedNetworkOptions    = []networkoptions.NetworkOption{networkoptions.Local, networkoptions.Tahoe}
-
 	// path to avalanchego config file
 	avagoConfigPath string
 	// path to avalanchego plugin dir
 	pluginDir string
-	// path to avalanchego datadir dir
-	dataDir string
 	// if true, print the manual instructions to screen
 	printManual bool
+	// skipWhitelistCheck if true doesn't prompt, skip the check
+	skipWhitelistCheck bool
+	// forceWhitelistCheck if true doesn't prompt, run the check
+	forceWhitelistCheck bool
+	// failIfNotValidating
+	failIfNotValidating bool
 	// if true, doesn't ask for overwriting the config file
 	forceWrite bool
-	// if true, validator is joining a permissionless subnet
-	joinElastic bool
-	// for permissionless subnet only: how much subnet native token will be staked in the validator
-	stakeAmount uint64
 )
 
-// avalanche subnet join
+// avalanche subnet deploy
 func newJoinCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "join [subnetName]",
@@ -72,25 +55,21 @@ After you update your validator's config, you need to restart your validator man
 you provide the --avalanchego-config flag, this command attempts to edit the config file
 at that path.
 
-This command currently only supports Subnets deployed on the Tahoe Testnet and Mainnet.`,
-		SilenceUsage: true,
-		RunE:         joinCmd,
-		Args:         cobra.ExactArgs(1),
+This command currently only supports Subnets deployed on the Fuji Testnet and Mainnet.`,
+		RunE: joinCmd,
+		Args: cobra.ExactArgs(1),
 	}
-	networkoptions.AddNetworkFlagsToCmd(cmd, &globalNetworkFlags, false, joinAllSupportedNetworkOptions)
 	cmd.Flags().StringVar(&avagoConfigPath, "avalanchego-config", "", "file path of the avalanchego config file")
 	cmd.Flags().StringVar(&pluginDir, "plugin-dir", "", "file path of avalanchego's plugin directory")
-	cmd.Flags().StringVar(&dataDir, "data-dir", "", "path of avalanchego's data dir directory")
+	cmd.Flags().BoolVar(&deployTestnet, "fuji", false, "join on `fuji` (alias for `testnet`)")
+	cmd.Flags().BoolVar(&deployTestnet, "testnet", false, "join on `testnet` (alias for `fuji`)")
+	cmd.Flags().BoolVar(&deployMainnet, "mainnet", false, "join on `mainnet`")
 	cmd.Flags().BoolVar(&printManual, "print", false, "if true, print the manual config without prompting")
+	cmd.Flags().BoolVar(&skipWhitelistCheck, "skip-whitelist-check", false, "if true, skip the whitelist check")
+	cmd.Flags().BoolVar(&forceWhitelistCheck, "force-whitelist-check", false, "if true, force the whitelist check")
+	cmd.Flags().BoolVar(&failIfNotValidating, "fail-if-not-validating", false, "fail if whitelist check fails")
 	cmd.Flags().StringVar(&nodeIDStr, "nodeID", "", "set the NodeID of the validator to check")
 	cmd.Flags().BoolVar(&forceWrite, "force-write", false, "if true, skip to prompt to overwrite the config file")
-	cmd.Flags().BoolVar(&joinElastic, "elastic", false, "set flag as true if joining elastic subnet")
-	cmd.Flags().Uint64Var(&stakeAmount, "stake-amount", 0, "amount of tokens to stake on validator")
-	cmd.Flags().StringVar(&startTimeStr, "start-time", "", "start time that validator starts validating")
-	cmd.Flags().DurationVar(&duration, "staking-period", 0, "how long validator validates for after start time")
-	cmd.Flags().StringVarP(&keyName, "key", "k", "", "select the key to use [tahoe only]")
-	cmd.Flags().BoolVarP(&useLedger, "ledger", "g", false, "use ledger instead of key (always true on mainnet, defaults to false on tahoe)")
-	cmd.Flags().StringSliceVar(&ledgerAddresses, "ledger-addrs", []string{}, "use the given ledger addresses")
 	return cmd
 }
 
@@ -99,11 +78,10 @@ func joinCmd(_ *cobra.Command, args []string) error {
 		return errors.New("--print cannot be used with --avalanchego-config or --plugin-dir")
 	}
 
-	chains, err := ValidateSubnetNameAndGetChains(args)
+	chains, err := validateSubnetNameAndGetChains(args)
 	if err != nil {
 		return err
 	}
-
 	subnetName := chains[0]
 
 	sc, err := app.LoadSidecar(subnetName)
@@ -111,34 +89,84 @@ func joinCmd(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	var supportedNetworkOptions []networkoptions.NetworkOption
-	if joinElastic {
-		supportedNetworkOptions = joinElasticSupportedNetworkOptions
-	} else {
-		supportedNetworkOptions = joinNonElasticSupportedNetworkOptions
-	}
-	network, err := networkoptions.GetNetworkFromCmdLineFlags(
-		app,
-		globalNetworkFlags,
-		false,
-		supportedNetworkOptions,
-		subnetName,
-	)
-	if err != nil {
-		return err
+	if !flags.EnsureMutuallyExclusive([]bool{deployMainnet, deployTestnet}) {
+		return errors.New("--fuji and --mainnet are mutually exclusive")
 	}
 
-	if joinElastic {
-		return handleValidatorJoinElasticSubnet(sc, network, subnetName)
+	var network models.Network
+	switch {
+	case deployTestnet:
+		network = models.Fuji
+	case deployMainnet:
+		network = models.Mainnet
 	}
 
-	network.HandlePublicNetworkSimulation()
+	if network == models.Undefined {
+		networkStr, err := app.Prompt.CaptureList(
+			"Choose a network to validate on (this command only supports public networks)",
+			[]string{models.Fuji.String(), models.Mainnet.String()},
+		)
+		if err != nil {
+			return err
+		}
+		// flag provided
+		networkStr = strings.Title(networkStr)
+		// as we are allowing a flag, we need to check if a supported network has been provided
+		if !(networkStr == models.Fuji.String() || networkStr == models.Mainnet.String()) {
+			return errors.New("unsupported network")
+		}
+		network = models.NetworkFromString(networkStr)
+	}
 
-	subnetID := sc.Networks[network.Name()].SubnetID
+	// used in E2E to simulate public network execution paths on a local network
+	if os.Getenv(constants.SimulatePublicNetwork) != "" {
+		network = models.Local
+	}
+
+	networkLower := strings.ToLower(network.String())
+
+	subnetID := sc.Networks[network.String()].SubnetID
 	if subnetID == ids.Empty {
 		return errNoSubnetID
 	}
 	subnetIDStr := subnetID.String()
+
+	if !skipWhitelistCheck {
+		yes := true
+		if !forceWhitelistCheck {
+			ask := "Would you like to check if your node is allowed to join this subnet?\n" +
+				"If not, the subnet's control key holder must call avalanche subnet\n" +
+				"addValidator with your NodeID."
+			ux.Logger.PrintToUser(ask)
+			yes, err = app.Prompt.CaptureYesNo("Check whitelist?")
+			if err != nil {
+				return err
+			}
+		}
+		if yes {
+			isValidating, err := isNodeValidatingSubnet(subnetID, network)
+			if err != nil {
+				return err
+			}
+			if !isValidating {
+				if failIfNotValidating {
+					ux.Logger.PrintToUser("The node is not whitelisted to validate this subnet.")
+					return nil
+				}
+				ux.Logger.PrintToUser(`The node is not whitelisted to validate this subnet.
+You can continue with this command, generating a config file or printing the whitelisting configuration,
+but until the node is whitelisted, it will not be able to validate this subnet.`)
+				y, err := app.Prompt.CaptureYesNo("Do you wish to continue")
+				if err != nil {
+					return err
+				}
+				if !y {
+					return nil
+				}
+			}
+			ux.Logger.PrintToUser("The node is already whitelisted! You are good to go.")
+		}
+	}
 
 	if printManual {
 		pluginDir = app.GetTmpPluginDir()
@@ -146,7 +174,7 @@ func joinCmd(_ *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		printJoinCmd(subnetIDStr, network, vmPath)
+		printJoinCmd(subnetIDStr, networkLower, vmPath)
 		return nil
 	}
 
@@ -171,7 +199,7 @@ func joinCmd(_ *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
-			printJoinCmd(subnetIDStr, network, vmPath)
+			printJoinCmd(subnetIDStr, networkLower, vmPath)
 			return nil
 		}
 	}
@@ -230,7 +258,7 @@ func joinCmd(_ *cobra.Command, args []string) error {
 			}
 		}
 		if pluginDir == "" {
-			pluginDir, err = app.Prompt.CaptureString("Path to your avalanchego plugin dir (likely .avalanchego/plugins)")
+			pluginDir, err = app.Prompt.CaptureString("Path to your avalanchego plugin dir (likely avalanchego/build/plugins)")
 			if err != nil {
 				return err
 			}
@@ -250,220 +278,50 @@ func joinCmd(_ *cobra.Command, args []string) error {
 
 	ux.Logger.PrintToUser("VM binary written to %s", vmPath)
 
-	if forceWrite {
-		if err := writeAvagoChainConfigFiles(app, dataDir, subnetName, sc, network); err != nil {
-			return err
-		}
-	}
-
-	subnetAvagoConfigFile := ""
-	if app.AvagoNodeConfigExists(subnetName) {
-		subnetAvagoConfigFile = app.GetAvagoNodeConfigPath(subnetName)
-	}
-
-	if err := plugins.EditConfigFile(
-		app,
-		subnetIDStr,
-		network,
-		avagoConfigPath,
-		forceWrite,
-		subnetAvagoConfigFile,
-	); err != nil {
+	if err := plugins.EditConfigFile(app, subnetIDStr, networkLower, avagoConfigPath, forceWrite); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func writeAvagoChainConfigFiles(
-	app *application.Avalanche,
-	dataDir string,
-	subnetName string,
-	sc models.Sidecar,
-	network models.Network,
-) error {
-	if dataDir == "" {
-		dataDir = utils.UserHomePath(".avalanchego")
-	}
+func isNodeValidatingSubnet(subnetID ids.ID, network models.Network) (bool, error) {
+	var (
+		nodeID ids.NodeID
+		err    error
+	)
+	if nodeIDStr == "" {
+		ux.Logger.PrintToUser("Next, we need the NodeID of the validator you want to whitelist.")
+		ux.Logger.PrintToUser("")
+		ux.Logger.PrintToUser("Check https://docs.avax.network/apis/avalanchego/apis/info#infogetnodeid for instructions about how to query the NodeID from your node")
+		ux.Logger.PrintToUser("(Edit host IP address and port to match your deployment, if needed).")
 
-	subnetID := sc.Networks[network.Name()].SubnetID
-	if subnetID == ids.Empty {
-		return errNoSubnetID
-	}
-	subnetIDStr := subnetID.String()
-	blockchainID := sc.Networks[network.Name()].BlockchainID
-
-	configsPath := filepath.Join(dataDir, "configs")
-
-	subnetConfigsPath := filepath.Join(configsPath, "subnets")
-	subnetConfigPath := filepath.Join(subnetConfigsPath, subnetIDStr+".json")
-	if app.AvagoSubnetConfigExists(subnetName) {
-		if err := os.MkdirAll(subnetConfigsPath, constants.DefaultPerms755); err != nil {
-			return err
-		}
-		subnetConfig, err := app.LoadRawAvagoSubnetConfig(subnetName)
+		promptStr := "What is the NodeID of the validator you'd like to whitelist?"
+		nodeID, err = app.Prompt.CaptureNodeID(promptStr)
 		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(subnetConfigPath, subnetConfig, constants.DefaultPerms755); err != nil {
-			return err
+			return false, err
 		}
 	} else {
-		_ = os.RemoveAll(subnetConfigPath)
-	}
-
-	if blockchainID != ids.Empty && app.ChainConfigExists(subnetName) || app.NetworkUpgradeExists(subnetName) {
-		chainConfigsPath := filepath.Join(configsPath, "chains", blockchainID.String())
-		if err := os.MkdirAll(chainConfigsPath, constants.DefaultPerms755); err != nil {
-			return err
-		}
-		chainConfigPath := filepath.Join(chainConfigsPath, "config.json")
-		if app.ChainConfigExists(subnetName) {
-			chainConfig, err := app.LoadRawChainConfig(subnetName)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(chainConfigPath, chainConfig, constants.DefaultPerms755); err != nil {
-				return err
-			}
-		} else {
-			_ = os.RemoveAll(chainConfigPath)
-		}
-		networkUpgradesPath := filepath.Join(chainConfigsPath, "upgrade.json")
-		if app.NetworkUpgradeExists(subnetName) {
-			networkUpgrades, err := app.LoadRawNetworkUpgrades(subnetName)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(networkUpgradesPath, networkUpgrades, constants.DefaultPerms755); err != nil {
-				return err
-			}
-		} else {
-			_ = os.RemoveAll(networkUpgradesPath)
+		nodeID, err = ids.NodeIDFromString(nodeIDStr)
+		if err != nil {
+			return false, err
 		}
 	}
 
-	return nil
-}
-
-func handleValidatorJoinElasticSubnet(sc models.Sidecar, network models.Network, subnetName string) error {
-	var err error
-	if len(ledgerAddresses) > 0 {
-		useLedger = true
-	}
-
-	if useLedger && keyName != "" {
-		return ErrMutuallyExlusiveKeyLedger
-	}
-
-	subnetID := sc.Networks[network.Name()].SubnetID
-	if os.Getenv(constants.SimulatePublicNetwork) != "" {
-		subnetID = sc.Networks[models.Local.String()].SubnetID
-	}
-	if subnetID == ids.Empty {
-		return errNoSubnetID
-	}
-
-	nodeID, err := promptNodeIDToAdd(subnetID, true, network)
-	if err != nil {
-		return err
-	}
-	stakedTokenAmount, err := promptStakeAmount(subnetName, true, network)
-	if err != nil {
-		return err
-	}
-	start, stakeDuration, err := getTimeParameters(network, nodeID, true)
-	if err != nil {
-		return err
-	}
-	endTime := start.Add(stakeDuration)
-	ux.Logger.PrintToUser("Inputs complete, issuing transaction for the provided validator to join elastic subnet...")
-	ux.Logger.PrintToUser("")
-	switch network.Kind {
-	case models.Local:
-		return handleValidatorJoinElasticSubnetLocal(sc, network, subnetName, nodeID, stakedTokenAmount, start, endTime)
-	case models.Tahoe:
-		if !useLedger && keyName == "" {
-			useLedger, keyName, err = prompts.GetFujiKeyOrLedger(app.Prompt, constants.PayTxsFeesMsg, app.GetKeyDir())
-			if err != nil {
-				return err
-			}
-		}
+	var api string
+	switch network {
+	case models.Fuji:
+		api = constants.FujiAPIEndpoint
 	case models.Mainnet:
-		return errors.New("unsupported network")
+		api = constants.MainnetAPIEndpoint
+	case models.Local:
+		api = constants.LocalAPIEndpoint
 	default:
-		return errors.New("unsupported network")
+		return false, fmt.Errorf("network not supported")
 	}
 
-	// get keychain accessor
-	fee := network.GenesisParams().AddSubnetValidatorFee
-	kc, err := keychain.GetKeychain(app, false, useLedger, ledgerAddresses, keyName, network, fee)
-	if err != nil {
-		return err
-	}
+	pClient := platformvm.NewClient(api)
 
-	network.HandlePublicNetworkSimulation()
-
-	recipientAddr := kc.Addresses().List()[0]
-	deployer := subnet.NewPublicDeployer(app, kc, network)
-	assetID, err := getSubnetAssetID(subnetID, network)
-	if err != nil {
-		return err
-	}
-	delegationFee := network.GenesisParams().MinDelegationFee
-	txID, err := deployer.AddPermissionlessValidator(subnetID, assetID, nodeID, stakedTokenAmount, uint64(start.Unix()), uint64(endTime.Unix()), recipientAddr, delegationFee, nil, nil)
-	if err != nil {
-		return err
-	}
-	printAddPermissionlessValOutput(txID, nodeID, network, start, endTime, stakedTokenAmount)
-	if err = app.UpdateSidecarPermissionlessValidator(&sc, network, nodeID.String(), txID); err != nil {
-		return fmt.Errorf("joining permissionless subnet was successful, but failed to update sidecar: %w", err)
-	}
-	return nil
-}
-
-func getSubnetAssetID(subnetID ids.ID, network models.Network) (ids.ID, error) {
-	pClient := platformvm.NewClient(network.Endpoint)
-	ctx := context.Background()
-	assetID, err := pClient.GetStakingAssetID(ctx, subnetID)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return assetID, nil
-}
-
-func printAddPermissionlessValOutput(txID ids.ID, nodeID ids.NodeID, network models.Network, start time.Time, endTime time.Time, stakedTokenAmount uint64) {
-	ux.Logger.PrintToUser("Validator successfully joined elastic subnet!")
-	ux.Logger.PrintToUser("TX ID: %s", txID.String())
-	ux.Logger.PrintToUser("NodeID: %s", nodeID.String())
-	ux.Logger.PrintToUser("Network: %s", network.Name())
-	ux.Logger.PrintToUser("Start time: %s", start.UTC().Format(constants.TimeParseLayout))
-	ux.Logger.PrintToUser("End time: %s", endTime.Format(constants.TimeParseLayout))
-	ux.Logger.PrintToUser("Stake Amount: %d", stakedTokenAmount)
-}
-
-func handleValidatorJoinElasticSubnetLocal(sc models.Sidecar, network models.Network, subnetName string, nodeID ids.NodeID,
-	stakedTokenAmount uint64, start time.Time, endTime time.Time,
-) error {
-	if network.Kind != models.Local {
-		return errors.New("unsupported network")
-	}
-	if !checkIfSubnetIsElasticOnLocal(sc) {
-		return fmt.Errorf("%s is not an elastic subnet", subnetName)
-	}
-	assetID := sc.ElasticSubnet[models.Local.String()].AssetID
-	testKey := genesis.EWOQKey
-	keyChain := secp256k1fx.NewKeychain(testKey)
-	subnetID := sc.Networks[models.Local.String()].SubnetID
-	txID, err := subnet.IssueAddPermissionlessValidatorTx(keyChain, subnetID, nodeID, stakedTokenAmount, assetID, uint64(start.Unix()), uint64(endTime.Unix()))
-	if err != nil {
-		return err
-	}
-	printAddPermissionlessValOutput(txID, nodeID, network, start, endTime, stakedTokenAmount)
-	if err = app.UpdateSidecarPermissionlessValidator(&sc, models.NewLocalNetwork(), nodeID.String(), txID); err != nil {
-		return fmt.Errorf("joining permissionless subnet was successful, but failed to update sidecar: %w", err)
-	}
-	return nil
+	return checkIsValidating(subnetID, nodeID, pClient)
 }
 
 func checkIsValidating(subnetID ids.ID, nodeID ids.NodeID, pClient platformvm.Client) (bool, error) {
@@ -481,154 +339,28 @@ func checkIsValidating(subnetID ids.ID, nodeID ids.NodeID, pClient platformvm.Cl
 			return true, nil
 		}
 	}
+
+	// if not, also check the pending validator set
+	pVals, _, err := pClient.GetPendingValidators(ctx, subnetID, nodeIDs)
+	if err != nil {
+		return false, err
+	}
+	// pVals is an array of interfaces as it can be of different types
+	// but it's content is a JSON map[string]interface{}
+	for _, iv := range pVals {
+		if v, ok := iv.(map[string]interface{}); ok {
+			// strictly this is not needed, as we are providing the nodeID as param
+			// just a double check
+			if v["nodeID"] == nodeID.String() {
+				return true, nil
+			}
+		}
+	}
+
 	return false, nil
 }
 
-func getLocalNetworkIDs() ([]string, error) {
-	var localNodeIDs []string
-	cli, err := binutils.NewGRPCClient()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := utils.GetAPIContext()
-	defer cancel()
-	status, err := cli.Status(ctx)
-	if err != nil {
-		if server.IsServerError(err, server.ErrNotBootstrapped) {
-			ux.Logger.PrintToUser("No local network running")
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if status != nil && status.ClusterInfo != nil {
-		for _, val := range status.ClusterInfo.NodeInfos {
-			localNodeIDs = append(localNodeIDs, val.Id)
-		}
-	}
-	return localNodeIDs, nil
-}
-
-func promptNodeIDToAdd(subnetID ids.ID, isValidator bool, network models.Network) (ids.NodeID, error) {
-	if nodeIDStr == "" {
-		if network.Kind != models.Local {
-			promptStr := "Please enter the Node ID of the node that you would like to add to the elastic subnet"
-			if !isValidator {
-				promptStr = "Please enter the Node ID of the validator that you would like to delegate to"
-			}
-			ux.Logger.PrintToUser(promptStr)
-			return app.Prompt.CaptureNodeID("Node ID (format it as NodeID-<node_id>)")
-		}
-		defaultLocalNetworkNodeIDs, err := getLocalNetworkIDs()
-		if err != nil {
-			return ids.EmptyNodeID, err
-		}
-		// Get NodeIDs of all validators on the subnet
-		validators, err := subnet.GetSubnetValidators(subnetID)
-		if err != nil {
-			return ids.EmptyNodeID, err
-		}
-		// construct list of validators to choose from
-		var validatorList []string
-		valNodeIDsMap := make(map[string]bool)
-		for _, val := range validators {
-			valNodeIDsMap[val.NodeID.String()] = true
-		}
-		if !isValidator {
-			for _, v := range validators {
-				validatorList = append(validatorList, v.NodeID.String())
-			}
-		} else {
-			for _, localNodeID := range defaultLocalNetworkNodeIDs {
-				if _, ok := valNodeIDsMap[localNodeID]; !ok {
-					validatorList = append(validatorList, localNodeID)
-				}
-			}
-		}
-		promptStr := "Which validator you'd like to join this elastic subnet?"
-		if !isValidator {
-			promptStr = "Which validator would you like to delegate to?"
-		}
-		nodeIDStr, err = app.Prompt.CaptureList(promptStr, validatorList)
-		if err != nil {
-			return ids.EmptyNodeID, err
-		}
-	}
-	nodeID, err := ids.NodeIDFromString(nodeIDStr)
-	if err != nil {
-		return ids.NodeID{}, err
-	}
-	return nodeID, nil
-}
-
-func promptStakeAmount(subnetName string, isValidator bool, network models.Network) (uint64, error) {
-	if stakeAmount > 0 {
-		return stakeAmount, nil
-	}
-	if network.Kind == models.Local {
-		esc, err := app.LoadElasticSubnetConfig(subnetName)
-		if err != nil {
-			return 0, err
-		}
-		maxValidatorStake := fmt.Sprintf("Maximum Validator Stake (%d)", esc.MaxValidatorStake)
-		customWeight := fmt.Sprintf("Custom (Has to be between minValidatorStake (%d) and maxValidatorStake (%d) defined during elastic subnet transformation)", esc.MinValidatorStake, esc.MaxValidatorStake)
-		if !isValidator {
-			customWeight = fmt.Sprintf("Custom (Has to be between minDelegatorStake (%d) and maxValidatorStake (%d) defined during elastic subnet transformation)", esc.MinDelegatorStake, esc.MaxValidatorStake)
-		}
-
-		txt := "What amount of the subnet native token would you like to stake?"
-		weightOptions := []string{maxValidatorStake, customWeight}
-		weightOption, err := app.Prompt.CaptureList(txt, weightOptions)
-		if err != nil {
-			return 0, err
-		}
-		pClient := platformvm.NewClient(constants.LocalAPIEndpoint)
-		walletBalance, err := getAssetBalance(pClient, ewoqPChainAddr, esc.AssetID)
-		if err != nil {
-			return 0, err
-		}
-		minStakePromptStr := fmt.Sprintf("Min Validator Stake(%d)", esc.MinValidatorStake)
-		minStakeVal := esc.MinValidatorStake
-		if !isValidator {
-			minStakePromptStr = fmt.Sprintf("Min Delegator Stake(%d)", esc.MinValidatorStake)
-			minStakeVal = esc.MinDelegatorStake
-		}
-		switch weightOption {
-		case maxValidatorStake:
-			return esc.MaxValidatorStake, nil
-		default:
-			return app.Prompt.CaptureUint64Compare(
-				txt,
-				[]prompts.Comparator{
-					{
-						Label: fmt.Sprintf("Max Validator Stake(%d)", esc.MaxValidatorStake),
-						Type:  prompts.LessThanEq,
-						Value: esc.MaxValidatorStake,
-					},
-					{
-						Label: minStakePromptStr,
-						Type:  prompts.MoreThanEq,
-						Value: minStakeVal,
-					},
-					{
-						Label: fmt.Sprintf("Wallet Balance(%d)", walletBalance),
-						Type:  prompts.LessThanEq,
-						Value: walletBalance,
-					},
-				},
-			)
-		}
-	}
-	ux.Logger.PrintToUser("What amount of the subnet native token would you like to stake?")
-	initialSupply, err := app.Prompt.CaptureUint64("Stake amount")
-	if err != nil {
-		return 0, err
-	}
-	return initialSupply, nil
-}
-
-func printJoinCmd(subnetID string, network models.Network, vmPath string) {
+func printJoinCmd(subnetID string, networkID string, vmPath string) {
 	msg := `
 To setup your node, you must do two things:
 
@@ -638,23 +370,20 @@ To setup your node, you must do two things:
 To add the VM to your plugin directory, copy or scp from %s
 
 If you installed avalanchego with the install script, your plugin directory is likely
-~/.avalanchego/plugins.
+~/.avalanchego/build/plugins.
 
 If you start your node from the command line WITHOUT a config file (e.g. via command
 line or systemd script), add the following flag to your node's startup command:
 
---track-subnets=%s
-(if the node already has a track-subnets config, append the new value by
+--whitelisted-subnets=%s
+(if the node already has a whitelisted-subnets config, append the new value by
 comma-separating it).
 
 For example:
-./build/avalanchego --network-id=%s --track-subnets=%s
+./build/avalanchego --network-id=%s --whitelisted-subnets=%s
 
 If you start the node via a JSON config file, add this to your config file:
-track-subnets: %s
-
-NOTE: The flag --track-subnets is a replacement of the deprecated --whitelisted-subnets.
-If the later is present in config, please rename it to track-subnets first.
+whitelisted-subnets: %s
 
 TIP: Try this command with the --avalanchego-config flag pointing to your config file,
 this tool will try to update the file automatically (make sure it can write to it).
@@ -662,20 +391,5 @@ this tool will try to update the file automatically (make sure it can write to i
 After you update your config, you will need to restart your node for the changes to
 take effect.`
 
-	ux.Logger.PrintToUser(msg, vmPath, subnetID, network.NetworkIDFlagValue(), subnetID, subnetID)
-}
-
-func getAssetBalance(pClient platformvm.Client, addr string, assetID ids.ID) (uint64, error) {
-	pID, err := address.ParseToID(addr)
-	if err != nil {
-		return 0, err
-	}
-	ctx, cancel := utils.GetAPIContext()
-	resp, err := pClient.GetBalance(ctx, []ids.ShortID{pID})
-	cancel()
-	if err != nil {
-		return 0, err
-	}
-	assetIDBalance := resp.Balances[assetID]
-	return uint64(assetIDBalance), nil
+	ux.Logger.PrintToUser(msg, vmPath, subnetID, networkID, subnetID, subnetID)
 }

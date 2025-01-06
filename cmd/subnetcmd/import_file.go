@@ -8,14 +8,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/user"
-	"path/filepath"
 
-	"github.com/cryft-labs/cryft-cli/pkg/apmintegration"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/cryft-labs/cryft-cli/pkg/vm"
+	"github.com/ava-labs/avalanche-cli/pkg/apmintegration"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 	"github.com/spf13/cobra"
 )
 
@@ -125,68 +122,13 @@ func importFromFile(importPath string) error {
 		return errors.New("subnet already exists. Use --" + forceFlag + " parameter to overwrite")
 	}
 
-	if importable.Sidecar.VM == models.CustomVM {
-		if importable.Sidecar.CustomVMRepoURL == "" {
-			return fmt.Errorf("repository url must be defined for custom vm import")
-		}
-		if importable.Sidecar.CustomVMBranch == "" {
-			return fmt.Errorf("repository branch must be defined for custom vm import")
-		}
-		if importable.Sidecar.CustomVMBuildScript == "" {
-			return fmt.Errorf("build script must be defined for custom vm import")
-		}
-
-		if err := vm.BuildCustomVM(app, &importable.Sidecar); err != nil {
-			return err
-		}
-
-		vmPath := app.GetCustomVMPath(subnetName)
-		rpcVersion, err := vm.GetVMBinaryProtocolVersion(vmPath)
-		if err != nil {
-			return fmt.Errorf("unable to get custom binary RPC version: %w", err)
-		}
-		if rpcVersion != importable.Sidecar.RPCVersion {
-			return fmt.Errorf("RPC version mismatch between sidecar and vm binary (%d vs %d)", importable.Sidecar.RPCVersion, rpcVersion)
-		}
-	}
-
-	if err := app.WriteGenesisFile(subnetName, importable.Genesis); err != nil {
+	err = app.WriteGenesisFile(subnetName, importable.Genesis)
+	if err != nil {
 		return err
 	}
 
-	if importable.NodeConfig != nil {
-		if err := app.WriteAvagoNodeConfigFile(subnetName, importable.NodeConfig); err != nil {
-			return err
-		}
-	} else {
-		_ = os.RemoveAll(app.GetAvagoNodeConfigPath(subnetName))
-	}
-
-	if importable.ChainConfig != nil {
-		if err := app.WriteChainConfigFile(subnetName, importable.ChainConfig); err != nil {
-			return err
-		}
-	} else {
-		_ = os.RemoveAll(app.GetChainConfigPath(subnetName))
-	}
-
-	if importable.SubnetConfig != nil {
-		if err := app.WriteAvagoSubnetConfigFile(subnetName, importable.SubnetConfig); err != nil {
-			return err
-		}
-	} else {
-		_ = os.RemoveAll(app.GetAvagoSubnetConfigPath(subnetName))
-	}
-
-	if importable.NetworkUpgrades != nil {
-		if err := app.WriteNetworkUpgradesFile(subnetName, importable.NetworkUpgrades); err != nil {
-			return err
-		}
-	} else {
-		_ = os.RemoveAll(app.GetUpgradeBytesFilepath(subnetName))
-	}
-
-	if err := app.CreateSidecar(&importable.Sidecar); err != nil {
+	err = app.CreateSidecar(&importable.Sidecar)
+	if err != nil {
 		return err
 	}
 
@@ -196,15 +138,6 @@ func importFromFile(importPath string) error {
 }
 
 func importFromAPM() error {
-	// setup apm
-	usr, err := user.Current()
-	if err != nil {
-		return err
-	}
-	apmBaseDir := filepath.Join(usr.HomeDir, constants.APMDir)
-	if err = apmintegration.SetupApm(app, apmBaseDir); err != nil {
-		return err
-	}
 	installedRepos, err := apmintegration.GetRepos(app)
 	if err != nil {
 		return err
@@ -330,7 +263,6 @@ func importFromAPM() error {
 		RPCVersion:      rpcVersion,
 		Subnet:          subnetDescr.Alias,
 		TokenName:       constants.DefaultTokenName,
-		TokenSymbol:     constants.DefaultTokenSymbol,
 		Version:         constants.SidecarVersion,
 		ImportedFromAPM: true,
 		ImportedVMID:    vmDescr.ID,

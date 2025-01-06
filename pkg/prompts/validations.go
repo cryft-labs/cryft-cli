@@ -3,26 +3,21 @@
 package prompts
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
-	"net/http"
 	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/MetalBlockchain/metalgo/genesis"
-
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/MetalBlockchain/metalgo/ids"
-	avagoconstants "github.com/MetalBlockchain/metalgo/utils/constants"
-	"github.com/MetalBlockchain/metalgo/utils/formatting/address"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanchego/ids"
+	avago_constants "github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -43,30 +38,16 @@ func validatePositiveBigInt(input string) error {
 	return nil
 }
 
-func validateMainnetStakingDuration(input string) error {
+func validateStakingDuration(input string) error {
 	d, err := time.ParseDuration(input)
 	if err != nil {
 		return err
 	}
-	if d > genesis.MainnetParams.MaxStakeDuration {
-		return fmt.Errorf("exceeds maximum staking duration of %s", ux.FormatDuration(genesis.MainnetParams.MaxStakeDuration))
+	if d > constants.MaxStakeDuration {
+		return fmt.Errorf("exceeds maximum staking duration of %s", ux.FormatDuration(constants.MaxStakeDuration))
 	}
-	if d < genesis.MainnetParams.MinStakeDuration {
-		return fmt.Errorf("below the minimum staking duration of %s", ux.FormatDuration(genesis.MainnetParams.MinStakeDuration))
-	}
-	return nil
-}
-
-func validateTahoeStakingDuration(input string) error {
-	d, err := time.ParseDuration(input)
-	if err != nil {
-		return err
-	}
-	if d > genesis.TahoeParams.MaxStakeDuration {
-		return fmt.Errorf("exceeds maximum staking duration of %s", ux.FormatDuration(genesis.TahoeParams.MaxStakeDuration))
-	}
-	if d < genesis.TahoeParams.MinStakeDuration {
-		return fmt.Errorf("below the minimum staking duration of %s", ux.FormatDuration(genesis.TahoeParams.MinStakeDuration))
+	if d < constants.MinStakeDuration {
+		return fmt.Errorf("below the minimum staking duration of %s", ux.FormatDuration(constants.MinStakeDuration))
 	}
 	return nil
 }
@@ -106,14 +87,14 @@ func validateWeight(input string) error {
 	if err != nil {
 		return err
 	}
-	if val < constants.MinStakeWeight {
+	if val < constants.MinStakeWeight || val > constants.MaxStakeWeight {
 		return errors.New("the weight must be an integer between 1 and 100")
 	}
 	return nil
 }
 
 func validateBiggerThanZero(input string) error {
-	val, err := strconv.ParseUint(input, 0, 64)
+	val, err := strconv.ParseUint(input, 10, 64)
 	if err != nil {
 		return err
 	}
@@ -123,7 +104,7 @@ func validateBiggerThanZero(input string) error {
 	return nil
 }
 
-func validateURLFormat(input string) error {
+func validateURL(input string) error {
 	_, err := url.ParseRequestURI(input)
 	if err != nil {
 		return err
@@ -148,7 +129,7 @@ func validatePChainFujiAddress(input string) error {
 	if err != nil {
 		return err
 	}
-	if hrp != avagoconstants.TahoeHRP {
+	if hrp != avago_constants.FujiHRP {
 		return errors.New("this is not a fuji address")
 	}
 	return nil
@@ -159,7 +140,7 @@ func validatePChainMainAddress(input string) error {
 	if err != nil {
 		return err
 	}
-	if hrp != avagoconstants.MainnetHRP {
+	if hrp != avago_constants.MainnetHRP {
 		return errors.New("this is not a mainnet address")
 	}
 	return nil
@@ -172,82 +153,20 @@ func validatePChainLocalAddress(input string) error {
 	}
 	// ANR uses the `custom` HRP for local networks,
 	// but the `local` HRP also exists...
-	if hrp != avagoconstants.LocalHRP && hrp != avagoconstants.FallbackHRP {
+	if hrp != avago_constants.LocalHRP && hrp != avago_constants.FallbackHRP {
 		return errors.New("this is not a local nor custom address")
 	}
 	return nil
 }
 
 func getPChainValidationFunc(network models.Network) func(string) error {
-	switch network.Kind {
-	case models.Tahoe:
+	switch network {
+	case models.Fuji:
 		return validatePChainFujiAddress
 	case models.Mainnet:
 		return validatePChainMainAddress
 	case models.Local:
 		return validatePChainLocalAddress
-	default:
-		return func(string) error {
-			return errors.New("unsupported network")
-		}
-	}
-}
-
-func validateXChainAddress(input string) (string, error) {
-	chainID, hrp, _, err := address.Parse(input)
-	if err != nil {
-		return "", err
-	}
-
-	if chainID != "X" {
-		return "", errors.New("this is not a XChain address")
-	}
-	return hrp, nil
-}
-
-func validateXChainFujiAddress(input string) error {
-	hrp, err := validateXChainAddress(input)
-	if err != nil {
-		return err
-	}
-	if hrp != avagoconstants.TahoeHRP {
-		return errors.New("this is not a fuji address")
-	}
-	return nil
-}
-
-func validateXChainMainAddress(input string) error {
-	hrp, err := validateXChainAddress(input)
-	if err != nil {
-		return err
-	}
-	if hrp != avagoconstants.MainnetHRP {
-		return errors.New("this is not a mainnet address")
-	}
-	return nil
-}
-
-func validateXChainLocalAddress(input string) error {
-	hrp, err := validateXChainAddress(input)
-	if err != nil {
-		return err
-	}
-	// ANR uses the `custom` HRP for local networks,
-	// but the `local` HRP also exists...
-	if hrp != avagoconstants.LocalHRP && hrp != avagoconstants.FallbackHRP {
-		return errors.New("this is not a local nor custom address")
-	}
-	return nil
-}
-
-func getXChainValidationFunc(network models.Network) func(string) error {
-	switch network.Kind {
-	case models.Tahoe:
-		return validateXChainFujiAddress
-	case models.Mainnet:
-		return validateXChainMainAddress
-	case models.Local:
-		return validateXChainLocalAddress
 	default:
 		return func(string) error {
 			return errors.New("unsupported network")
@@ -265,71 +184,4 @@ func validateNewFilepath(input string) error {
 		return nil
 	}
 	return errors.New("file already exists")
-}
-
-func validateNonEmpty(input string) error {
-	if input == "" {
-		return errors.New("string cannot be empty")
-	}
-	return nil
-}
-
-func RequestURL(url string) (*http.Response, error) {
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request for url %s: %w", url, err)
-	}
-	token := os.Getenv(constants.GithubAPITokenEnvVarName)
-	if token != "" {
-		// avoid rate limitation issues at CI
-		request.Header.Set("authorization", fmt.Sprintf("Bearer %s", token))
-	}
-	resp, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected http status code: %d", resp.StatusCode)
-	}
-	return resp, nil
-}
-
-func ValidateURL(url string) error {
-	if err := validateURLFormat(url); err != nil {
-		return err
-	}
-	resp, err := RequestURL(url)
-	if err != nil {
-		return err
-	}
-	// will just ignore this error, url is already validated
-	_ = resp.Body.Close()
-	return nil
-}
-
-func ValidateRepoBranch(repo string, branch string) error {
-	url := repo + "/tree/" + branch
-	return ValidateURL(url)
-}
-
-func ValidateRepoFile(repo string, branch string, file string) error {
-	url := repo + "/blob/" + branch + "/" + file
-	return ValidateURL(url)
-}
-
-func ValidateHexa(input string) error {
-	if input == "" {
-		return errors.New("string cannot be empty")
-	}
-	if len(input) < 2 || strings.ToLower(input[:2]) != "0x" {
-		return errors.New("hexa string has not 0x prefix")
-	}
-	if len(input) == 2 {
-		return errors.New("no hexa digits in string")
-	}
-	_, err := hex.DecodeString(input[2:])
-	if err != nil {
-		return errors.New("string not in hexa format")
-	}
-	return err
 }

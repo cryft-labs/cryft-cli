@@ -9,10 +9,12 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
 )
+
+const gitExtension = ".git"
 
 // Returns alias
 func AddRepo(app *application.Avalanche, repoURL *url.URL, branch string) (string, error) {
@@ -22,14 +24,14 @@ func AddRepo(app *application.Avalanche, repoURL *url.URL, branch string) (strin
 	}
 
 	if alias == constants.DefaultAvaLabsPackage {
-		ux.Logger.PrintToUser("Metal Plugins Core already installed, skipping...")
+		ux.Logger.PrintToUser("Avalanche Plugins Core already installed, skipping...")
 		return "", nil
 	}
 
 	repoStr := repoURL.String()
 
-	if path.Ext(repoStr) != constants.GitExtension {
-		repoStr += constants.GitExtension
+	if path.Ext(repoStr) != gitExtension {
+		repoStr += gitExtension
 	}
 
 	fmt.Println("Installing repo")

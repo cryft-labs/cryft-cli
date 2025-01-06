@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/cmd/flags"
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/cmd/flags"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -161,7 +161,7 @@ func TestCheckForInvalidDeployAndSetAvagoVersion(t *testing.T) {
 			networkErr:      nil,
 			desiredRPC:      19,
 			desiredVersion:  testLatestAvagoVersion,
-			expectError:     false,
+			expectError:     true,
 			expectedVersion: testAvagoVersion1,
 			compatData:      nil,
 			compatError:     errors.New("no compat"),
@@ -194,13 +194,12 @@ func TestCheckForInvalidDeployAndSetAvagoVersion(t *testing.T) {
 			mockDownloader := &mocks.Downloader{}
 			mockDownloader.On("Download", mock.Anything).Return(tt.compatData, nil)
 			mockDownloader.On("GetLatestReleaseVersion", mock.Anything).Return(tt.expectedVersion, nil)
-			mockDownloader.On("GetLatestPreReleaseVersion", mock.Anything, mock.Anything).Return(tt.expectedVersion, nil)
 
 			app = application.New()
 			app.Log = logging.NoLog{}
 			app.Downloader = mockDownloader
 
-			desiredAvagoVersion, err := CheckForInvalidDeployAndGetAvagoVersion(&mockSC, tt.desiredRPC)
+			desiredAvagoVersion, err := checkForInvalidDeployAndGetAvagoVersion(&mockSC, tt.desiredRPC)
 
 			if tt.expectError {
 				require.Error(err)

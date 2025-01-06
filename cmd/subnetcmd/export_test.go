@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cryft-labs/cryft-cli/internal/mocks"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/prompts"
-	"github.com/cryft-labs/cryft-cli/pkg/ux"
-	"github.com/cryft-labs/cryft-cli/pkg/vm"
-	"github.com/cryft-labs/cryft-cli/tests/e2e/utils"
-	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/ava-labs/avalanche-cli/internal/mocks"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/prompts"
+	"github.com/ava-labs/avalanche-cli/pkg/ux"
+	"github.com/ava-labs/avalanche-cli/pkg/vm"
+	"github.com/ava-labs/avalanche-cli/tests/e2e/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -35,17 +35,7 @@ func TestExportImportSubnet(t *testing.T) {
 
 	app.Setup(testDir, logging.NoLog{}, nil, prompts.NewPrompter(), &mockAppDownloader)
 	ux.NewUserLog(logging.NoLog{}, io.Discard)
-	genBytes, sc, err := vm.CreateEvmSubnetConfig(
-		app,
-		testSubnet,
-		"../../"+utils.SubnetEvmGenesisPath,
-		vmVersion,
-		false,
-		0,
-		"",
-		false,
-		false,
-	)
+	genBytes, sc, err := vm.CreateEvmSubnetConfig(app, testSubnet, "../../"+utils.SubnetEvmGenesisPath, vmVersion)
 	require.NoError(err)
 	err = app.WriteGenesisFile(testSubnet, genBytes)
 	require.NoError(err)
@@ -60,7 +50,7 @@ func TestExportImportSubnet(t *testing.T) {
 		exportOutput = ""
 		app = nil
 	}()
-	globalNetworkFlags.UseLocal = true
+
 	err = exportSubnet(nil, []string{"this-does-not-exist-should-fail"})
 	require.Error(err)
 
@@ -78,8 +68,7 @@ func TestExportImportSubnet(t *testing.T) {
 	require.Equal(control["VM"], "Subnet-EVM")
 	require.Equal(control["VMVersion"], vmVersion)
 	require.Equal(control["Subnet"], testSubnet)
-	require.Equal(control["TokenName"], "Test Token")
-	require.Equal(control["TokenSymbol"], "TEST")
+	require.Equal(control["TokenName"], "TEST")
 	require.Equal(control["Version"], constants.SidecarVersion)
 	require.Equal(control["Networks"], nil)
 

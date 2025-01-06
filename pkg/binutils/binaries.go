@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
 )
 
 var (
@@ -26,7 +26,6 @@ var (
 
 type PluginBinaryDownloader interface {
 	InstallVM(vmID, vmBin string) error
-	UpgradeVM(vmID, vmBin string) error
 	RemoveVM(vmID string) error
 }
 
@@ -141,7 +140,7 @@ func installTarGzArchive(targz []byte, binDir string) error {
 	byteReader := bytes.NewReader(targz)
 	uncompressedStream, err := gzip.NewReader(byteReader)
 	if err != nil {
-		return fmt.Errorf("failed creating gzip reader from metalgo binary stream: %w", err)
+		return fmt.Errorf("failed creating gzip reader from avalanchego binary stream: %w", err)
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)
@@ -219,23 +218,7 @@ func (pbd *pluginBinaryDownloader) InstallVM(vmID, vmBin string) error {
 	}
 
 	if err := CopyFile(vmBin, binaryPath); err != nil {
-		return fmt.Errorf("failed copying vm to plugin dir: %w", err)
-	}
-	return nil
-}
-
-func (pbd *pluginBinaryDownloader) UpgradeVM(vmID, vmBin string) error {
-	// target of VM install
-	binaryPath := filepath.Join(pbd.app.GetPluginsDir(), vmID)
-
-	// check if binary is already present, it should already exist
-	if _, err := os.Stat(binaryPath); errors.Is(err, os.ErrNotExist) {
-		return errors.New("vm binary does not exist, are you sure this Subnet is ready to upgrade?")
-	}
-
-	// overwrite existing file with new binary
-	if err := CopyFile(vmBin, binaryPath); err != nil {
-		return fmt.Errorf("failed copying vm to plugin dir: %w", err)
+		return fmt.Errorf("failed copying custom vm to plugin dir: %w", err)
 	}
 	return nil
 }

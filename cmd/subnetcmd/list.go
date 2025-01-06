@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
-	"github.com/cryft-labs/cryft-cli/pkg/models"
-	"github.com/cryft-labs/cryft-cli/pkg/subnet"
-	"github.com/MetalBlockchain/metal-network-runner/utils"
-	"github.com/MetalBlockchain/metalgo/ids"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/models"
+	"github.com/ava-labs/avalanche-cli/pkg/subnet"
+	"github.com/ava-labs/avalanche-network-runner/utils"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -24,11 +24,9 @@ var deployed bool
 // avalanche subnet list
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all created Subnet configurations",
-		Long: `The subnet list command prints the names of all created Subnet configurations. Without any flags,
-it prints some general, static information about the Subnet. With the --deployed flag, the command
-shows additional information including the VMID, BlockchainID and SubnetID.`,
+		Use:          "list",
+		Short:        "List all created Subnet configurations",
+		Long:         `The Subnet list command prints the names of all created Subnet configurations.`,
 		RunE:         listSubnets,
 		SilenceUsage: true,
 	}
@@ -140,7 +138,7 @@ func getSidecars(app *application.Avalanche) ([]*models.Sidecar, error) {
 }
 
 func listDeployInfo(*cobra.Command, []string) error {
-	header := []string{"subnet", "chain", "vm ID", "Local Network", "Tahoe (testnet)", "Mainnet"}
+	header := []string{"subnet", "chain", "vm ID", "Local Network", "Fuji (testnet)", "Mainnet"}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(header)
 	table.SetAutoMergeCellsByColumnIndex([]int{0, 1, 2, 3, 4})
@@ -160,7 +158,7 @@ func listDeployInfo(*cobra.Command, []string) error {
 		return err
 	}
 
-	fujiKey := models.Tahoe.String()
+	fujiKey := models.Fuji.String()
 	mainKey := models.Mainnet.String()
 
 	singleLine := true
@@ -216,7 +214,6 @@ func listDeployInfo(*cobra.Command, []string) error {
 			rows = append(rows, []string{
 				sc.Subnet,
 				sc.Name,
-				vmID,
 				deployedLocal,
 				netToID[fujiKey][1],
 				netToID[mainKey][1],

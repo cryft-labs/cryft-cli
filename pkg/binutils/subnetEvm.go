@@ -6,18 +6,18 @@ package binutils
 import (
 	"path/filepath"
 
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
 )
 
-func SetupSubnetEVM(app *application.Avalanche, subnetEVMVersion string) (string, string, error) {
+func SetupSubnetEVM(app *application.Avalanche, subnetEVMVersion string) (string, error) {
 	// Check if already installed
 	binDir := app.GetSubnetEVMBinDir()
 	subDir := filepath.Join(binDir, subnetEVMBinPrefix+subnetEVMVersion)
 
 	installer := NewInstaller()
 	downloader := NewSubnetEVMDownloader()
-	version, vmDir, err := InstallBinary(
+	vmDir, err := InstallBinary(
 		app,
 		subnetEVMVersion,
 		binDir,
@@ -28,5 +28,5 @@ func SetupSubnetEVM(app *application.Avalanche, subnetEVMVersion string) (string
 		downloader,
 		installer,
 	)
-	return version, filepath.Join(vmDir, constants.SubnetEVMBin), err
+	return filepath.Join(vmDir, constants.SubnetEVMBin), err
 }

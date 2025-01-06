@@ -3,56 +3,27 @@
 package models
 
 import (
-	"github.com/MetalBlockchain/metal-network-runner/utils"
-	"github.com/MetalBlockchain/metalgo/ids"
+	"github.com/ava-labs/avalanche-network-runner/utils"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 type NetworkData struct {
-	SubnetID                    ids.ID
-	TransferSubnetOwnershipTxID ids.ID
-	BlockchainID                ids.ID
-	RPCVersion                  int
-	TeleporterMessengerAddress  string
-	TeleporterRegistryAddress   string
-}
-
-type PermissionlessValidators struct {
-	TxID ids.ID
-}
-type ElasticSubnet struct {
-	SubnetID    ids.ID
-	AssetID     ids.ID
-	PChainTXID  ids.ID
-	TokenName   string
-	TokenSymbol string
-	Validators  map[string]PermissionlessValidators
-	Txs         map[string]ids.ID
+	SubnetID     ids.ID
+	BlockchainID ids.ID
 }
 
 type Sidecar struct {
-	Name                string
-	VM                  VMType
-	VMVersion           string
-	RPCVersion          int
-	Subnet              string
-	TokenName           string
-	TokenSymbol         string
-	ChainID             string
-	Version             string
-	Networks            map[string]NetworkData
-	ElasticSubnet       map[string]ElasticSubnet
-	ImportedFromAPM     bool
-	ImportedVMID        string
-	CustomVMRepoURL     string
-	CustomVMBranch      string
-	CustomVMBuildScript string
-	// Teleporter related
-	TeleporterReady   bool
-	TeleporterKey     string
-	TeleporterVersion string
-	RunRelayer        bool
-	// SubnetEVM based VM's only
-	SubnetEVMMainnetChainID uint
+	Name            string
+	VM              VMType
+	VMVersion       string
+	RPCVersion      int
+	Subnet          string
+	TokenName       string
+	ChainID         string
+	Version         string
+	Networks        map[string]NetworkData
+	ImportedFromAPM bool
+	ImportedVMID    string
 }
 
 func (sc Sidecar) GetVMID() (string, error) {

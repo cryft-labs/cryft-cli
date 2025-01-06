@@ -6,18 +6,24 @@ package apmintegration
 import (
 	"os"
 
-	"github.com/cryft-labs/apm/apm"
-	"github.com/cryft-labs/apm/config"
-	"github.com/cryft-labs/cryft-cli/pkg/application"
-	"github.com/cryft-labs/cryft-cli/pkg/constants"
+	"github.com/ava-labs/apm/apm"
+	"github.com/ava-labs/apm/config"
+	"github.com/ava-labs/avalanche-cli/pkg/application"
+	"github.com/ava-labs/avalanche-cli/pkg/constants"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/afero"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	credentialsFileKey  = "credentials-file"
+	adminAPIEndpointKey = "admin-api-endpoint"
 )
 
 // Note, you can only call this method once per run
 func SetupApm(app *application.Avalanche, apmBaseDir string) error {
-	credentials, err := initCredentials(app)
+	credentials, err := initCredentials()
 	if err != nil {
 		return err
 	}
@@ -42,7 +48,7 @@ func SetupApm(app *application.Avalanche, apmBaseDir string) error {
 	apmConfig := apm.Config{
 		Directory:        apmBaseDir,
 		Auth:             credentials,
-		AdminAPIEndpoint: app.Conf.GetConfigStringValue(constants.ConfigAPMAdminAPIEndpointKey),
+		AdminAPIEndpoint: viper.GetString(adminAPIEndpointKey),
 		PluginDir:        app.GetAPMPluginDir(),
 		Fs:               fs,
 	}
@@ -60,13 +66,13 @@ func SetupApm(app *application.Avalanche, apmBaseDir string) error {
 // If we need to use custom git credentials (say for private repos).
 // the zero value for credentials is safe to use.
 // Stolen from APM repo
-func initCredentials(app *application.Avalanche) (http.BasicAuth, error) {
+func initCredentials() (http.BasicAuth, error) {
 	result := http.BasicAuth{}
 
-	if app.Conf.ConfigValueIsSet(constants.ConfigAPMCredentialsFileKey) {
+	if viper.IsSet(credentialsFileKey) {
 		credentials := &config.Credential{}
 
-		bytes, err := os.ReadFile(app.Conf.GetConfigStringValue(constants.ConfigAPMCredentialsFileKey))
+		bytes, err := os.ReadFile(viper.GetString(credentialsFileKey))
 		if err != nil {
 			return result, err
 		}

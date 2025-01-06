@@ -88,8 +88,8 @@ func TestEarliestTimestamp(t *testing.T) {
 {"contractNativeMinterConfig":{"adminAddresses":["0xb794F5eA0ba39494cE839613fffBA74279579268"],"blockTimestamp":%d,"initialFeeConfig":{}}}
 ]}`,
 					time.Now().Add(10*time.Millisecond).Unix(),
-					time.Now().Add(15*time.Millisecond).Unix(),
 					time.Now().Add(20*time.Millisecond).Unix(),
+					time.Now().Add(30*time.Millisecond).Unix(),
 				)),
 			earliest:    targetEarliest,
 			expectedErr: errNoUpcomingUpgrades,
@@ -98,10 +98,10 @@ func TestEarliestTimestamp(t *testing.T) {
 
 	require := require.New(t)
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			upgrades, err := getAllUpgrades(tt.upgradesFile)
 			require.NoError(err)
-			earliest, err := getEarliestUpcomingTimestamp(upgrades)
+			earliest, err := getEarliestTimestamp(upgrades)
 			if tt.expectedErr != nil {
 				// give some time so timestamps are defo before now
 				time.Sleep(1 * time.Second)
@@ -158,6 +158,12 @@ func TestUpgradeBytesValidation(t *testing.T) {
 			expectedErr: errBlockTimestampInvalid,
 		},
 		{
+			name: "blockTimestamp in the past",
+			upgradesFile: []byte(
+				`{"precompileUpgrades":[{"feeManagerConfig":{"adminAddresses":["0xb794F5eA0ba39494cE839613fffBA74279579268"],"blockTimestamp":1674496268,"initialFeeConfig":{}}}]}`),
+			expectedErr: errBlockTimestampInthePast,
+		},
+		{
 			name: "blockTimestamp ok",
 			upgradesFile: []byte(
 				fmt.Sprintf(`{"precompileUpgrades":[{"feeManagerConfig":{"adminAddresses":["0xb794F5eA0ba39494cE839613fffBA74279579268"],"blockTimestamp":%d,"initialFeeConfig":{}}}]}`,
@@ -167,24 +173,13 @@ func TestUpgradeBytesValidation(t *testing.T) {
 		},
 	}
 
-	skipPrompting := false
 	require := require.New(t)
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			_, err := validateUpgradeBytes(tt.upgradesFile, nil, skipPrompting)
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := validateUpgradeBytes(tt.upgradesFile, nil)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
-}
-
-func TestForceIgnorePastTimestamp(t *testing.T) {
-	skipPrompting := true
-	upgradesFile := []byte(
-		`{"precompileUpgrades":[{"feeManagerConfig":{"adminAddresses":["0xb794F5eA0ba39494cE839613fffBA74279579268"],"blockTimestamp":1674496268,"initialFeeConfig":{}}}]}`)
-
-	require := require.New(t)
-	_, err := validateUpgradeBytes(upgradesFile, nil, skipPrompting)
-	require.NoError(err)
 }
 
 func TestLockFile(t *testing.T) {
@@ -252,11 +247,10 @@ func TestLockFile(t *testing.T) {
 		},
 	}
 
-	skipPrompting := false
 	require := require.New(t)
 	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			_, err := validateUpgradeBytes(tt.upgradesFile, tt.lockFile, skipPrompting)
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := validateUpgradeBytes(tt.upgradesFile, tt.lockFile)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
